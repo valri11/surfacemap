@@ -41,7 +41,7 @@ const view = new View({
   zoom: 14
 });
 
-const contours = new VectorTileLayer({
+const contoursLayer = new VectorTileLayer({
   source: new VectorTile({
     //url: 'http://localhost:8000/contours/{z}/{x}/{y}.geojson',
     //format: new GeoJSON()
@@ -57,7 +57,7 @@ const map = new Map({
       source: new OSM()
       //source: source
     }),
-    contours
+    contoursLayer
   ],
   view: view
 });
@@ -148,7 +148,11 @@ map.on('pointermove', function(evt) {
     console.log(JSON.stringify(properties["elevation"]));
 
     var info = document.getElementById('mouse-position');
-    info.innerHTML = '<pre>' + 'Elevation: ' + JSON.stringify(properties["elevation"]) + '</pre>'
+    info.innerHTML = '<pre>'
+    info.innerHTML += 'Elevation: ' + JSON.stringify(properties["elevation"])
+    info.innerHTML += ', '
+    info.innerHTML += 'Contour interval: ' + ctrInterval + 'm';
+    info.innerHTML += '</pre>'
 
     var coordinate = evt.coordinate;
 
@@ -186,3 +190,23 @@ closer.onclick = function() {
   closer.blur();
   return false;
 };
+
+var ctrInterval = 100;
+
+$("#slider-id").slider({
+    value: ctrInterval,
+    min: 10,
+    max: 500,
+    step: 10,
+    slide: function(e, ui) {
+        ctrInterval = ui.value;
+
+        var info = document.getElementById('mouse-position');
+        info.innerHTML = '<pre>'
+        info.innerHTML += 'Contour interval: ' + ctrInterval + 'm';
+        info.innerHTML += '</pre>'
+
+        let url = 'http://localhost:8000/contours/{z}/{x}/{y}.mvt?interval=' + ctrInterval.toString()
+        contoursLayer.getSource().setUrl(url);
+    }
+});

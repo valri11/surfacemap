@@ -198,7 +198,20 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Contours params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+	interval := "100"
+	intervals, ok := r.URL.Query()["interval"]
+	if ok {
+		interval = intervals[0]
+	}
+	iLvl, err := strconv.Atoi(interval)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	lvlInterval := float64(iLvl)
+
+	log.Printf("Contours params: z=%v, x=%v, y=%v, interval=%s\n",
+		vars["z"], vars["x"], vars["y"], interval)
 
 	zoom, err := strconv.Atoi(vars["z"])
 	if err != nil {
@@ -272,8 +285,6 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 
 	z0 := m.Min
 	z1 := m.Max
-
-	lvlInterval := float64(100)
 
 	zLevel := math.Ceil(z0/lvlInterval) * lvlInterval
 

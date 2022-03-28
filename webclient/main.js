@@ -17,8 +17,14 @@ import {
 import * as olProj from 'ol/proj';
 import Overlay from 'ol/Overlay';
 
+const config = {
+    contours: {
+        host: "localhost",
+        port: "8000",
+    }
+};
 const source = new XYZ({
-  url: 'http://localhost:8000/terra/{z}/{x}/{y}.img'
+  url: 'http://' + config.contours.host + ':' + config.contours.port + '/terra/{z}/{x}/{y}.img'
 });
 
 const kyrg = olProj.fromLonLat([74.57950579031711, 42.51248314829303])

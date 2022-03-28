@@ -36,16 +36,22 @@ const mtOlympus = olProj.fromLonLat([22.35011553189942, 40.08838447876729])
 const khanTengri = olProj.fromLonLat([80.17411914133028, 42.213405765504476])
 const challengerDeep = olProj.fromLonLat([142.592522558379, 11.393434778584895])
 
+var ctrInterval = 100;
+
 const view = new View({
   center: kyrg,
   zoom: 14
 });
 
+function getContoursUrl(interval) {
+    return 'http://' + config.contours.host + ':' + config.contours.port + '/contours/{z}/{x}/{y}.mvt?interval=' + interval
+}
+
 const contoursLayer = new VectorTileLayer({
   source: new VectorTile({
     //url: 'http://localhost:8000/contours/{z}/{x}/{y}.geojson',
     //format: new GeoJSON()
-    url: 'http://localhost:8000/contours/{z}/{x}/{y}.mvt',
+    url: getContoursUrl(ctrInterval),
     format: new MVT()
   })
 });
@@ -105,14 +111,15 @@ function flyTo(location, done) {
   let called = false;
 
   function callback(complete) {
-    contours.setVisible(false);
+    contoursLayer.setVisible(false);
     --parts;
     if (called) {
       return;
     }
     if (parts === 0 || !complete) {
       called = true;
-      contours.setVisible(true);
+      var visible = document.getElementById("ckeckbox-contours").checked
+      contoursLayer.setVisible(visible);
       done(complete);
     }
   }
@@ -191,7 +198,6 @@ closer.onclick = function() {
   return false;
 };
 
-var ctrInterval = 100;
 
 $("#slider-id").slider({
     value: ctrInterval,
@@ -206,7 +212,18 @@ $("#slider-id").slider({
         info.innerHTML += 'Contour interval: ' + ctrInterval + 'm';
         info.innerHTML += '</pre>'
 
-        let url = 'http://localhost:8000/contours/{z}/{x}/{y}.mvt?interval=' + ctrInterval.toString()
+        let url = getContoursUrl(ctrInterval);
         contoursLayer.getSource().setUrl(url);
     }
 });
+
+document.getElementById("ckeckbox-contours").addEventListener('change', function() {
+  if (this.checked) {
+    console.log("Checkbox is checked..");
+    contoursLayer.setVisible(true);
+  } else {
+    console.log("Checkbox is not checked..");
+    contoursLayer.setVisible(false);
+  }
+});
+

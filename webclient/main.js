@@ -14,8 +14,9 @@ import MousePosition from 'ol/control/MousePosition';
 import {
   createStringXY
 } from 'ol/coordinate';
-import * as olProj from 'ol/proj';
+import {fromLonLat} from 'ol/proj';
 import Overlay from 'ol/Overlay';
+import {Fill, Stroke, Style, Text} from 'ol/style';
 
 const config = {
     contours: {
@@ -27,14 +28,14 @@ const source = new XYZ({
   url: 'http://' + config.contours.host + ':' + config.contours.port + '/terra/{z}/{x}/{y}.img'
 });
 
-const kyrg = olProj.fromLonLat([74.57950579031711, 42.51248314829303])
-const mtEverest = olProj.fromLonLat([86.9251465845193, 27.98955908635046])
-const katoomba = olProj.fromLonLat([150.3120553998699, -33.73196775624329])
-const grandCanyonUSA = olProj.fromLonLat([-118.12954343868806, 34.22960585491841])
-const pikPobedy = olProj.fromLonLat([80.129257551509, 42.03767896555761])
-const mtOlympus = olProj.fromLonLat([22.35011553189942, 40.08838447876729])
-const khanTengri = olProj.fromLonLat([80.17411914133028, 42.213405765504476])
-const challengerDeep = olProj.fromLonLat([142.592522558379, 11.393434778584895])
+const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
+const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
+const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
+const grandCanyonUSA = fromLonLat([-118.12954343868806, 34.22960585491841])
+const pikPobedy = fromLonLat([80.129257551509, 42.03767896555761])
+const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
+const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
+const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 var ctrInterval = 100;
 
@@ -42,6 +43,32 @@ const view = new View({
   center: kyrg,
   zoom: 14
 });
+
+const labelStyle = new Style({
+  text: new Text({
+    font: '8px Calibri,sans-serif',
+    overflow: true,
+    fill: new Fill({
+      color: '#000',
+    }),
+    stroke: new Stroke({
+      color: '#fff',
+      width: 3,
+    }),
+  }),
+});
+
+const lineStyle = new Style({
+  fill: new Fill({
+    color: 'rgba(255, 255, 255, 0.6)',
+  }),
+  stroke: new Stroke({
+    color: '#319FD3',
+    width: 1,
+  }),
+});
+
+const style = [lineStyle, labelStyle];
 
 function getContoursUrl(interval) {
     return 'http://' + config.contours.host + ':' + config.contours.port + '/contours/{z}/{x}/{y}.mvt?interval=' + interval
@@ -53,7 +80,13 @@ const contoursLayer = new VectorTileLayer({
     //format: new GeoJSON()
     url: getContoursUrl(ctrInterval),
     format: new MVT()
-  })
+  }),
+  style: function (feature) {
+    const label = feature.getProperties()['elevation'].toString() + '\n';
+    labelStyle.getText().setText(label);
+    return style;
+  },
+  declutter: true,
 });
 
 const map = new Map({

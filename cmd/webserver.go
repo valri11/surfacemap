@@ -32,6 +32,8 @@ import (
 	"github.com/fogleman/colormap"
 	"github.com/fogleman/contourmap"
 	"github.com/fogleman/gg"
+
+	lrucache "github.com/hashicorp/golang-lru"
 )
 
 const (
@@ -51,16 +53,6 @@ var webserverCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(webserverCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// webserverCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// webserverCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 const (
@@ -68,6 +60,7 @@ const (
 	awsRegion   = "us-east-1"
 )
 
+const CacheSize = 500
 const TileSize = 256
 
 type FeatureOutFormat string
@@ -83,14 +76,20 @@ type s3Config struct {
 }
 
 type terra struct {
-	cfg      aws.Config
-	s3Config s3Config
+	cfg       aws.Config
+	s3Config  s3Config
+	tileCache *lrucache.Cache
 }
 
 func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
+	tileCache, err := lrucache.New(CacheSize)
+	if err != nil {
+		return nil, err
+	}
 	t := terra{
-		cfg:      cfg,
-		s3Config: s3Config,
+		cfg:       cfg,
+		s3Config:  s3Config,
+		tileCache: tileCache,
 	}
 	return &t, nil
 }
@@ -110,18 +109,15 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	}
 
 	r := mux.NewRouter()
-	//r.HandleFunc("/", HomeHandler)
 	r.HandleFunc("/terra/{z}/{x}/{y}.img", t.tilesHandler)
 	r.HandleFunc("/contours/{z}/{x}/{y}.{format}", t.tilesContoursHandler)
-	//http.Handle("/", r)
 
 	// Where ORIGIN_ALLOWED is like `scheme://dns[:port]`, or `*` (insecure)
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "content-type", "username", "password", "Referer"})
 	originsOk := handlers.AllowedOrigins([]string{"*"})
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
 
-	// start server listen
-	// with error handling
+	// start server listen with error handling
 	log.Fatal(http.ListenAndServe("0.0.0.0:8000", handlers.CORS(originsOk, headersOk, methodsOk)(r)))
 }
 
@@ -233,7 +229,7 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s3Client := s3.NewFromConfig(h.cfg)
-	// request surround tiles
+	// request surrounding tiles
 
 	steps := [9][2]int{{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {0, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
 
@@ -244,56 +240,57 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	for idx, d := range steps {
 		oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X+d[0], tile_Y+d[1])
 
-		//		if !(d[0] == 0 && d[1] == 0) {
-		//			continue
-		//		}
+		// cache lookup
+		if h.tileCache.Contains(oName) {
+			dtRead1 := time.Now()
+			obj, ok := h.tileCache.Get(oName)
+			if !ok {
+				http.Error(w, "cache error", http.StatusBadRequest)
+				return
+			}
 
-		goi := &s3.GetObjectInput{
-			Bucket: aws.String(h.s3Config.bucket),
-			Key:    aws.String(oName),
+			data, ok := obj.(*bytes.Buffer)
+			if !ok {
+				http.Error(w, "cache error", http.StatusBadRequest)
+				return
+			}
+
+			tiles[idx] = data
+
+			dtRead2 := time.Now()
+			log.Printf("Cache hit: %s, read: %d in %v", oName, data.Len(), dtRead2.Sub(dtRead1))
+		} else {
+			dtRead1 := time.Now()
+
+			goi := &s3.GetObjectInput{
+				Bucket: aws.String(h.s3Config.bucket),
+				Key:    aws.String(oName),
+			}
+
+			goo, err := s3Client.GetObject(ctx, goi)
+			if err != nil {
+				log.Printf("req: %s, ERR: %v", oName, err)
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			data := new(bytes.Buffer)
+			data.ReadFrom(goo.Body)
+
+			dRead += data.Len()
+
+			tiles[idx] = data
+
+			// add cache entry
+			h.tileCache.Add(oName, data)
+
+			goo.Body.Close()
+
+			dtRead2 := time.Now()
+			log.Printf("S3 GetObject: %s, read: %d in %v", oName, data.Len(), dtRead2.Sub(dtRead1))
 		}
-
-		goo, err := s3Client.GetObject(ctx, goi)
-		if err != nil {
-			log.Printf("req: %s, ERR: %v", oName, err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(goo.Body)
-
-		dRead += buf.Len()
-
-		tiles[idx] = buf
-
-		goo.Body.Close()
 	}
 	dt2 := time.Now()
-
-	//	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X, tile_Y)
-	//
-	//	s3Client := s3.NewFromConfig(h.cfg)
-	//	goi := &s3.GetObjectInput{
-	//		Bucket: aws.String(h.s3Config.bucket),
-	//		Key:    aws.String(oName),
-	//	}
-	//
-	//	dt1 := time.Now()
-	//
-	//	goo, err := s3Client.GetObject(ctx, goi)
-	//	if err != nil {
-	//		log.Printf("req: %s, ERR: %v", oName, err)
-	//		http.Error(w, err.Error(), http.StatusBadRequest)
-	//		return
-	//	}
-	//
-	//	buf := new(bytes.Buffer)
-	//	buf.ReadFrom(goo.Body)
-	//	dRead := buf.Len()
-	//
-	//	goo.Body.Close()
-	//	dt2 := time.Now()
 
 	log.Printf("read %d bytes in %v\n", dRead, dt2.Sub(dt1))
 
@@ -320,75 +317,38 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 				idxH := 0
 				if idx == 0 {
 					idxH = x + y*3*TileSize
-					data[idxH] = h
 				}
 				if idx == 1 {
 					idxH = x + TileSize + y*3*TileSize
-					data[idxH] = h
 				}
 				if idx == 2 {
 					idxH = x + 2*TileSize + y*3*TileSize
-					data[idxH] = h
 				}
 				if idx == 3 {
 					idxH = x + (y+TileSize)*3*TileSize
-					data[idxH] = h
 				}
 				if idx == 4 {
 					idxH = (x + TileSize) + (y+TileSize)*3*TileSize
-					data[idxH] = h
 				}
 				if idx == 5 {
 					idxH = (x + 2*TileSize) + (y+TileSize)*3*TileSize
-					data[idxH] = h
 				}
 				if idx == 6 {
 					idxH = (x) + (y+2*TileSize)*3*TileSize
-					data[idxH] = h
 				}
 				if idx == 7 {
 					idxH = (x + TileSize) + (y+2*TileSize)*3*TileSize
-					data[idxH] = h
 				}
 				if idx == 8 {
 					idxH = (x + 2*TileSize) + (y+2*TileSize)*3*TileSize
-					data[idxH] = h
 				}
 
-				//data[idxH] = h
+				data[idxH] = h
 			}
 		}
 	}
 
-	//	buf := tiles[4]
-	//	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
-	//	if err != nil {
-	//		log.Printf("req: ERR: %v", err)
-	//		http.Error(w, err.Error(), http.StatusBadRequest)
-	//		return
-	//	}
-	//
-	//	bounds := img.Bounds()
-	//	width, height := bounds.Max.X, bounds.Max.Y
-	//
-	//	//data := make([]float64, width*height)
-	//	idx := 0
-	//	for y := 0; y < height; y++ {
-	//		for x := 0; x < width; x++ {
-	//			dr, dg, db, da := img.At(x, y).RGBA()
-	//			dr &= 0xff
-	//			dg &= 0xff
-	//			db &= 0xff
-	//			da &= 0xff
-	//			h := rgbaToHeight(uint16(dr), uint16(dg), uint16(db), uint16(da))
-	//			data[idx] = h
-	//			idx++
-	//		}
-	//	}
-
-	//m := contourmap.FromFloat64s(width, height, data)
 	m := contourmap.FromFloat64s(3*TileSize, 3*TileSize, data)
-	//m = m.Closed()
 
 	z0 := m.Min
 	z1 := m.Max
@@ -403,17 +363,6 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 			ls := orb.LineString{}
 			for _, point := range contour {
 
-				//				if point.X < float64(TileSize) || point.X > float64(2*TileSize) {
-				//					continue
-				//				}
-				//				if point.Y < float64(TileSize) || point.Y > float64(2*TileSize) {
-				//					continue
-				//				}
-				//
-				//				point.X -= float64(TileSize)
-				//				point.Y -= float64(TileSize)
-
-				//lon, lat := toGeo(float64(tile_X*TileSize)+point.X, float64(tile_Y*TileSize)+point.Y, uint32(zoom+8))
 				lon, lat := toGeo(float64((tile_X-1)*TileSize)+point.X, float64((tile_Y-1)*TileSize)+point.Y, uint32(zoom+8))
 				pt := orb.Point{lon, lat}
 				ls = append(ls, pt)

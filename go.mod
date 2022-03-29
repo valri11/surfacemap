@@ -11,6 +11,7 @@ require (
 	github.com/fogleman/gg v1.3.0
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/paulmach/orb v0.4.0
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.10.1

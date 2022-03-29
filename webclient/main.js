@@ -17,6 +17,8 @@ import {
 import {fromLonLat} from 'ol/proj';
 import Overlay from 'ol/Overlay';
 import {Fill, Stroke, Style, Text} from 'ol/style';
+import TileDebug from 'ol/source/TileDebug';
+import {createXYZ} from 'ol/tilegrid';
 
 const config = {
     contours: {
@@ -89,6 +91,15 @@ const contoursLayer = new VectorTileLayer({
   declutter: true,
 });
 
+const debugLayer = new TileLayer({
+    source: new TileDebug({
+        projection: 'EPSG:3857',
+        tileGrid: createXYZ({
+        maxZoom: 21
+        })
+  })
+});
+
 const map = new Map({
   target: 'map',
   layers: [
@@ -96,6 +107,7 @@ const map = new Map({
       source: new OSM()
       //source: source
     }),
+    debugLayer,
     contoursLayer
   ],
   view: view
@@ -151,7 +163,7 @@ function flyTo(location, done) {
     }
     if (parts === 0 || !complete) {
       called = true;
-      var visible = document.getElementById("ckeckbox-contours").checked
+      var visible = document.getElementById("checkbox-contours").checked
       contoursLayer.setVisible(visible);
       done(complete);
     }
@@ -250,7 +262,7 @@ $("#slider-id").slider({
     }
 });
 
-document.getElementById("ckeckbox-contours").addEventListener('change', function() {
+document.getElementById("checkbox-contours").addEventListener('change', function() {
   if (this.checked) {
     console.log("Checkbox is checked..");
     contoursLayer.setVisible(true);
@@ -260,3 +272,13 @@ document.getElementById("ckeckbox-contours").addEventListener('change', function
   }
 });
 
+var showDebug = document.getElementById("checkbox-debug").checked
+debugLayer.setVisible(showDebug);
+
+document.getElementById("checkbox-debug").addEventListener('change', function() {
+  if (this.checked) {
+    debugLayer.setVisible(true);
+  } else {
+    debugLayer.setVisible(false);
+  }
+});

@@ -67,6 +67,8 @@ const (
 	awsRegion   = "us-east-1"
 )
 
+const TileSize = 256
+
 type FeatureOutFormat string
 
 const (
@@ -229,59 +231,163 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X, tile_Y)
-
 	s3Client := s3.NewFromConfig(h.cfg)
-	goi := &s3.GetObjectInput{
-		Bucket: aws.String(h.s3Config.bucket),
-		Key:    aws.String(oName),
-	}
+	// request surround tiles
 
+	steps := [9][2]int{{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {0, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
+
+	tiles := make([]*bytes.Buffer, 9)
+
+	dRead := 0
 	dt1 := time.Now()
+	for idx, d := range steps {
+		oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X+d[0], tile_Y+d[1])
 
-	goo, err := s3Client.GetObject(ctx, goi)
-	if err != nil {
-		log.Printf("req: %s, ERR: %v", oName, err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		//		if !(d[0] == 0 && d[1] == 0) {
+		//			continue
+		//		}
+
+		goi := &s3.GetObjectInput{
+			Bucket: aws.String(h.s3Config.bucket),
+			Key:    aws.String(oName),
+		}
+
+		goo, err := s3Client.GetObject(ctx, goi)
+		if err != nil {
+			log.Printf("req: %s, ERR: %v", oName, err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(goo.Body)
+
+		dRead += buf.Len()
+
+		tiles[idx] = buf
+
+		goo.Body.Close()
 	}
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(goo.Body)
-	dRead := buf.Len()
-
-	goo.Body.Close()
 	dt2 := time.Now()
+
+	//	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X, tile_Y)
+	//
+	//	s3Client := s3.NewFromConfig(h.cfg)
+	//	goi := &s3.GetObjectInput{
+	//		Bucket: aws.String(h.s3Config.bucket),
+	//		Key:    aws.String(oName),
+	//	}
+	//
+	//	dt1 := time.Now()
+	//
+	//	goo, err := s3Client.GetObject(ctx, goi)
+	//	if err != nil {
+	//		log.Printf("req: %s, ERR: %v", oName, err)
+	//		http.Error(w, err.Error(), http.StatusBadRequest)
+	//		return
+	//	}
+	//
+	//	buf := new(bytes.Buffer)
+	//	buf.ReadFrom(goo.Body)
+	//	dRead := buf.Len()
+	//
+	//	goo.Body.Close()
+	//	dt2 := time.Now()
 
 	log.Printf("read %d bytes in %v\n", dRead, dt2.Sub(dt1))
 
-	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
-	if err != nil {
-		log.Printf("req: %s, ERR: %v", oName, err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	data := make([]float64, 9*TileSize*TileSize)
 
-	bounds := img.Bounds()
-	width, height := bounds.Max.X, bounds.Max.Y
+	for idx := 0; idx < 9; idx++ {
+		buf := tiles[idx]
+		img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
+		if err != nil {
+			log.Printf("req: ERR: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 
-	data := make([]float64, width*height)
-	idx := 0
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			dr, dg, db, da := img.At(x, y).RGBA()
-			dr &= 0xff
-			dg &= 0xff
-			db &= 0xff
-			da &= 0xff
-			h := rgbaToHeight(uint16(dr), uint16(dg), uint16(db), uint16(da))
-			data[idx] = h
-			idx++
+		for y := 0; y < TileSize; y++ {
+			for x := 0; x < TileSize; x++ {
+				dr, dg, db, da := img.At(x, y).RGBA()
+				dr &= 0xff
+				dg &= 0xff
+				db &= 0xff
+				da &= 0xff
+				h := rgbaToHeight(uint16(dr), uint16(dg), uint16(db), uint16(da))
+
+				idxH := 0
+				if idx == 0 {
+					idxH = x + y*3*TileSize
+					data[idxH] = h
+				}
+				if idx == 1 {
+					idxH = x + TileSize + y*3*TileSize
+					data[idxH] = h
+				}
+				if idx == 2 {
+					idxH = x + 2*TileSize + y*3*TileSize
+					data[idxH] = h
+				}
+				if idx == 3 {
+					idxH = x + (y+TileSize)*3*TileSize
+					data[idxH] = h
+				}
+				if idx == 4 {
+					idxH = (x + TileSize) + (y+TileSize)*3*TileSize
+					data[idxH] = h
+				}
+				if idx == 5 {
+					idxH = (x + 2*TileSize) + (y+TileSize)*3*TileSize
+					data[idxH] = h
+				}
+				if idx == 6 {
+					idxH = (x) + (y+2*TileSize)*3*TileSize
+					data[idxH] = h
+				}
+				if idx == 7 {
+					idxH = (x + TileSize) + (y+2*TileSize)*3*TileSize
+					data[idxH] = h
+				}
+				if idx == 8 {
+					idxH = (x + 2*TileSize) + (y+2*TileSize)*3*TileSize
+					data[idxH] = h
+				}
+
+				//data[idxH] = h
+			}
 		}
 	}
 
-	m := contourmap.FromFloat64s(width, height, data)
-	m = m.Closed()
+	//	buf := tiles[4]
+	//	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
+	//	if err != nil {
+	//		log.Printf("req: ERR: %v", err)
+	//		http.Error(w, err.Error(), http.StatusBadRequest)
+	//		return
+	//	}
+	//
+	//	bounds := img.Bounds()
+	//	width, height := bounds.Max.X, bounds.Max.Y
+	//
+	//	//data := make([]float64, width*height)
+	//	idx := 0
+	//	for y := 0; y < height; y++ {
+	//		for x := 0; x < width; x++ {
+	//			dr, dg, db, da := img.At(x, y).RGBA()
+	//			dr &= 0xff
+	//			dg &= 0xff
+	//			db &= 0xff
+	//			da &= 0xff
+	//			h := rgbaToHeight(uint16(dr), uint16(dg), uint16(db), uint16(da))
+	//			data[idx] = h
+	//			idx++
+	//		}
+	//	}
+
+	//m := contourmap.FromFloat64s(width, height, data)
+	m := contourmap.FromFloat64s(3*TileSize, 3*TileSize, data)
+	//m = m.Closed()
 
 	z0 := m.Min
 	z1 := m.Max
@@ -295,9 +401,24 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		for _, contour := range contours {
 			ls := orb.LineString{}
 			for _, point := range contour {
-				lon, lat := toGeo(float64(tile_X*256)+point.X, float64(tile_Y*256)+point.Y, uint32(zoom+8))
+
+				//				if point.X < float64(TileSize) || point.X > float64(2*TileSize) {
+				//					continue
+				//				}
+				//				if point.Y < float64(TileSize) || point.Y > float64(2*TileSize) {
+				//					continue
+				//				}
+				//
+				//				point.X -= float64(TileSize)
+				//				point.Y -= float64(TileSize)
+
+				//lon, lat := toGeo(float64(tile_X*TileSize)+point.X, float64(tile_Y*TileSize)+point.Y, uint32(zoom+8))
+				lon, lat := toGeo(float64((tile_X-1)*TileSize)+point.X, float64((tile_Y-1)*TileSize)+point.Y, uint32(zoom+8))
 				pt := orb.Point{lon, lat}
 				ls = append(ls, pt)
+			}
+			if len(ls) == 0 {
+				continue
 			}
 			feat := geojson.NewFeature(ls)
 			feat.Properties["elevation"] = zLevel

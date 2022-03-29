@@ -26,6 +26,7 @@ import (
 	"github.com/paulmach/orb/encoding/mvt"
 	"github.com/paulmach/orb/geojson"
 	"github.com/paulmach/orb/maptile"
+	"github.com/paulmach/orb/simplify"
 	"github.com/spf13/cobra"
 
 	"github.com/fogleman/colormap"
@@ -445,6 +446,13 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		// Convert to a layers object and project to tile coordinates.
 		layers := mvt.NewLayers(colMvt)
 		layers.ProjectToTile(maptile.New(uint32(tile_X), uint32(tile_Y), maptile.Zoom(zoom)))
+
+		layers.Simplify(simplify.DouglasPeucker(1.0))
+
+		// Depending on use-case remove empty geometry, those too small to be
+		// represented in this tile space.
+		// In this case lines shorter than 1, and areas smaller than 2.
+		layers.RemoveEmpty(1.0, 2.0)
 
 		// encoding using the Mapbox Vector Tile protobuf encoding.
 		out, err = mvt.Marshal(layers) // this data is NOT gzipped.

@@ -19,6 +19,7 @@ import Overlay from 'ol/Overlay';
 import {Fill, Stroke, Style, Text} from 'ol/style';
 import TileDebug from 'ol/source/TileDebug';
 import {createXYZ} from 'ol/tilegrid';
+import {Attribution, defaults as defaultControls} from 'ol/control';
 
 const config = {
     contours: {
@@ -81,7 +82,8 @@ const contoursLayer = new VectorTileLayer({
     //url: 'http://localhost:8000/contours/{z}/{x}/{y}.geojson',
     //format: new GeoJSON()
     url: getContoursUrl(ctrInterval),
-    format: new MVT()
+    format: new MVT(),
+    attributions: ['<br>Contours derived from: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Licence</a>'],
   }),
   style: function (feature) {
     const label = feature.getProperties()['elevation'].toString() + '\n';
@@ -100,6 +102,10 @@ const debugLayer = new TileLayer({
   })
 });
 
+const attribution = new Attribution({
+  collapsible: false,
+});
+
 const map = new Map({
   target: 'map',
   layers: [
@@ -110,6 +116,7 @@ const map = new Map({
     debugLayer,
     contoursLayer
   ],
+  controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
 });
 

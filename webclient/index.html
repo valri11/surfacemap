@@ -21,6 +21,8 @@
   <div>
   <input type="checkbox" id="checkbox-contours" name="checkbox-contours" checked>
   <label for="checkbox-contours">Show contours</label>
+  <input type="checkbox" id="checkbox-terra" name="checkbox-terra" checked>
+  <label for="checkbox-terra">Show terrain</label>
   </div>
   <div id="slider-id"><div class="ui-slider-handle"></div></div>
   <button id="fly-to-kg">KG</button>
@@ -36,6 +38,23 @@
     <a href="#" id="popup-closer" class="ol-popup-closer"></a>
     <div id="popup-content"></div>
   </div>
+  <table class="controls">
+    <tr>
+      <td><label for="vert">vertical exaggeration:</label></td>
+      <td><input id="vert" type="range" min="1" max="5" value="1"/></td>
+      <td><span id="vertOut"></span> x</td>
+    </tr>
+    <tr>
+      <td><label for="sunEl">sun elevation:</label></td>
+      <td><input id="sunEl" type="range" min="0" max="90" value="45"/></td>
+      <td><span id="sunElOut"></span> °</td>
+    </tr>
+    <tr>
+      <td><label for="sunAz">sun azimuth:</label></td>
+      <td><input id="sunAz" type="range" min="0" max="360" value="45"/></td>
+      <td><span id="sunAzOut"></span> °</td>
+    </tr>
+  </table>
   <script type="module" src="./main.js"></script>
 </body>
 

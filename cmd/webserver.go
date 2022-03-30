@@ -144,31 +144,55 @@ func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oName := fmt.Sprintf("v2/normal/%d/%d/%d.png", z, x, y)
+	//oName := fmt.Sprintf("v2/normal/%d/%d/%d.png", z, x, y)
+	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", z, x, y)
 
-	s3Client := s3.NewFromConfig(h.cfg)
-	goi := &s3.GetObjectInput{
-		Bucket: aws.String(h.s3Config.bucket),
-		Key:    aws.String(oName),
-	}
-
+	var buf *bytes.Buffer
+	// cache lookup
 	dt1 := time.Now()
-	goo, err := s3Client.GetObject(ctx, goi)
-	if err != nil {
-		log.Printf("req: %s, ERR: %v", oName, err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	if h.tileCache.Contains(oName) {
+		obj, ok := h.tileCache.Get(oName)
+		if !ok {
+			http.Error(w, "cache error", http.StatusBadRequest)
+			return
+		}
+
+		cacheData, ok := obj.([]byte)
+		if !ok {
+			http.Error(w, "cache error", http.StatusBadRequest)
+			return
+		}
+		buf = bytes.NewBuffer(cacheData)
+
+		dt2 := time.Now()
+		log.Printf("Cache hit: %s, read: %d in %v", oName, buf.Len(), dt2.Sub(dt1))
+	} else {
+		s3Client := s3.NewFromConfig(h.cfg)
+		goi := &s3.GetObjectInput{
+			Bucket: aws.String(h.s3Config.bucket),
+			Key:    aws.String(oName),
+		}
+
+		goo, err := s3Client.GetObject(ctx, goi)
+		if err != nil {
+			log.Printf("req: %s, ERR: %v", oName, err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		buf = new(bytes.Buffer)
+		buf.ReadFrom(goo.Body)
+		dRead := buf.Len()
+
+		goo.Body.Close()
+		// add cache entry
+		cacheData := make([]byte, buf.Len())
+		copy(cacheData, buf.Bytes())
+		h.tileCache.Add(oName, cacheData)
+
+		dt2 := time.Now()
+		log.Printf("S3 GetObject: %s, read: %d in %v", oName, dRead, dt2.Sub(dt1))
 	}
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(goo.Body)
-	dRead := buf.Len()
-
-	goo.Body.Close()
-	dt2 := time.Now()
-
-	log.Printf("read %d bytes in %v\n", dRead, dt2.Sub(dt1))
-
 	w.Header().Set("Content-Type", "image/png")
 
 	out := buf.Bytes()
@@ -249,12 +273,13 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			data, ok := obj.(*bytes.Buffer)
+			cacheData, ok := obj.([]byte)
 			if !ok {
 				http.Error(w, "cache error", http.StatusBadRequest)
 				return
 			}
 
+			data := bytes.NewBuffer(cacheData)
 			tiles[idx] = data
 
 			dtRead2 := time.Now()
@@ -282,7 +307,9 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 			tiles[idx] = data
 
 			// add cache entry
-			h.tileCache.Add(oName, data)
+			cacheData := make([]byte, data.Len())
+			copy(cacheData, data.Bytes())
+			h.tileCache.Add(oName, cacheData)
 
 			goo.Body.Close()
 

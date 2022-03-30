@@ -1,25 +1,15 @@
 import './style.css';
-import {
-  Map,
-  View
-} from 'ol';
-import TileLayer from 'ol/layer/Tile';
-import VectorTileLayer from 'ol/layer/VectorTile';
-import OSM from 'ol/source/OSM';
-import VectorTile from 'ol/source/VectorTile';
-import XYZ from 'ol/source/XYZ';
-import GeoJSON from 'ol/format/GeoJSON';
-import MVT from 'ol/format/MVT';
-import MousePosition from 'ol/control/MousePosition';
-import {
-  createStringXY
-} from 'ol/coordinate';
+import Map from 'ol/Map';
+import View from 'ol/View';
+import {Tile as TileLayer, VectorTile as VectorTileLayer, Image as ImageLayer} from 'ol/layer';
+import {TileDebug, OSM, XYZ, VectorTile, Raster} from 'ol/source';
+import {GeoJSON, MVT} from 'ol/format';
+import {createStringXY} from 'ol/coordinate';
 import {fromLonLat} from 'ol/proj';
 import Overlay from 'ol/Overlay';
 import {Fill, Stroke, Style, Text} from 'ol/style';
-import TileDebug from 'ol/source/TileDebug';
 import {createXYZ} from 'ol/tilegrid';
-import {Attribution, defaults as defaultControls} from 'ol/control';
+import {Attribution, MousePosition, defaults as defaultControls} from 'ol/control';
 
 const config = {
     contours: {
@@ -27,8 +17,21 @@ const config = {
         port: "8000",
     }
 };
-const source = new XYZ({
-  url: 'http://' + config.contours.host + ':' + config.contours.port + '/terra/{z}/{x}/{y}.img'
+
+const sourceTerra = new XYZ({
+  url: 'http://' + config.contours.host + ':' + config.contours.port + '/terra/{z}/{x}/{y}.img',
+  crossOrigin: 'anonymous',
+});
+
+const raster = new Raster({
+  sources: [sourceTerra],
+  operationType: 'image',
+  operation: shade,
+});
+
+const terraLayer = new ImageLayer({
+  opacity: 0.3,
+  source: raster,
 });
 
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
@@ -111,10 +114,10 @@ const map = new Map({
   layers: [
     new TileLayer({
       source: new OSM()
-      //source: source
     }),
     debugLayer,
-    contoursLayer
+    contoursLayer,
+    terraLayer
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -164,14 +167,17 @@ function flyTo(location, done) {
 
   function callback(complete) {
     contoursLayer.setVisible(false);
+    terraLayer.setVisible(false);
     --parts;
     if (called) {
       return;
     }
     if (parts === 0 || !complete) {
       called = true;
-      var visible = document.getElementById("checkbox-contours").checked
-      contoursLayer.setVisible(visible);
+      var v1 = document.getElementById("checkbox-contours").checked
+      contoursLayer.setVisible(v1);
+      var v2 = document.getElementById("checkbox-terra").checked
+      terraLayer.setVisible(v2);
       done(complete);
     }
   }
@@ -271,12 +277,14 @@ $("#slider-id").slider({
 
 document.getElementById("checkbox-contours").addEventListener('change', function() {
   if (this.checked) {
-    console.log("Checkbox is checked..");
     contoursLayer.setVisible(true);
   } else {
-    console.log("Checkbox is not checked..");
     contoursLayer.setVisible(false);
   }
+});
+
+document.getElementById("checkbox-terra").addEventListener('change', function() {
+  terraLayer.setVisible(this.checked);
 });
 
 var showDebug = document.getElementById("checkbox-debug").checked
@@ -287,5 +295,143 @@ document.getElementById("checkbox-debug").addEventListener('change', function() 
     debugLayer.setVisible(true);
   } else {
     debugLayer.setVisible(false);
+  }
+});
+
+function shade(inputs, data) {
+  const elevationImage = inputs[0];
+  const width = elevationImage.width;
+  const height = elevationImage.height;
+  const elevationData = elevationImage.data;
+  const shadeData = new Uint8ClampedArray(elevationData.length);
+  const dp = data.resolution * 2;
+  const maxX = width - 1;
+  const maxY = height - 1;
+  const pixel = [0, 0, 0, 0];
+  const twoPi = 2 * Math.PI;
+  const halfPi = Math.PI / 2;
+  const sunEl = (Math.PI * data.sunEl) / 180;
+  const sunAz = (Math.PI * data.sunAz) / 180;
+  const cosSunEl = Math.cos(sunEl);
+  const sinSunEl = Math.sin(sunEl);
+  let pixelX,
+    pixelY,
+    x0,
+    x1,
+    y0,
+    y1,
+    offset,
+    z0,
+    z1,
+    dzdx,
+    dzdy,
+    slope,
+    aspect,
+    cosIncidence,
+    scaled;
+  function calculateElevation(pixel) {
+    // The method used to extract elevations from the DEM.
+    // In this case the format used is
+    // red + green * 2 + blue * 3
+    //
+    // Other frequently used methods include the Mapbox format
+    // (red * 256 * 256 + green * 256 + blue) * 0.1 - 10000
+    // and the Terrarium format
+    // (red * 256 + green + blue / 256) - 32768
+    //
+    //return pixel[0] + pixel[1] * 2 + pixel[2] * 3;
+    return (pixel[0] * 256 + pixel[1] + pixel[2] / 256) - 32768;
+  }
+  for (pixelY = 0; pixelY <= maxY; ++pixelY) {
+    y0 = pixelY === 0 ? 0 : pixelY - 1;
+    y1 = pixelY === maxY ? maxY : pixelY + 1;
+    for (pixelX = 0; pixelX <= maxX; ++pixelX) {
+      x0 = pixelX === 0 ? 0 : pixelX - 1;
+      x1 = pixelX === maxX ? maxX : pixelX + 1;
+
+      // determine elevation for (x0, pixelY)
+      offset = (pixelY * width + x0) * 4;
+      pixel[0] = elevationData[offset];
+      pixel[1] = elevationData[offset + 1];
+      pixel[2] = elevationData[offset + 2];
+      pixel[3] = elevationData[offset + 3];
+      z0 = data.vert * calculateElevation(pixel);
+
+      // determine elevation for (x1, pixelY)
+      offset = (pixelY * width + x1) * 4;
+      pixel[0] = elevationData[offset];
+      pixel[1] = elevationData[offset + 1];
+      pixel[2] = elevationData[offset + 2];
+      pixel[3] = elevationData[offset + 3];
+      z1 = data.vert * calculateElevation(pixel);
+
+      dzdx = (z1 - z0) / dp;
+
+      // determine elevation for (pixelX, y0)
+      offset = (y0 * width + pixelX) * 4;
+      pixel[0] = elevationData[offset];
+      pixel[1] = elevationData[offset + 1];
+      pixel[2] = elevationData[offset + 2];
+      pixel[3] = elevationData[offset + 3];
+      z0 = data.vert * calculateElevation(pixel);
+
+      // determine elevation for (pixelX, y1)
+      offset = (y1 * width + pixelX) * 4;
+      pixel[0] = elevationData[offset];
+      pixel[1] = elevationData[offset + 1];
+      pixel[2] = elevationData[offset + 2];
+      pixel[3] = elevationData[offset + 3];
+      z1 = data.vert * calculateElevation(pixel);
+
+      dzdy = (z1 - z0) / dp;
+
+      slope = Math.atan(Math.sqrt(dzdx * dzdx + dzdy * dzdy));
+
+      aspect = Math.atan2(dzdy, -dzdx);
+      if (aspect < 0) {
+        aspect = halfPi - aspect;
+      } else if (aspect > halfPi) {
+        aspect = twoPi - aspect + halfPi;
+      } else {
+        aspect = halfPi - aspect;
+      }
+
+      cosIncidence =
+        sinSunEl * Math.cos(slope) +
+        cosSunEl * Math.sin(slope) * Math.cos(sunAz - aspect);
+
+      offset = (pixelY * width + pixelX) * 4;
+      scaled = 255 * cosIncidence;
+      shadeData[offset] = scaled;
+      shadeData[offset + 1] = scaled;
+      shadeData[offset + 2] = scaled;
+      shadeData[offset + 3] = elevationData[offset + 3];
+    }
+  }
+
+  return {data: shadeData, width: width, height: height};
+}
+
+const controlIds = ['vert', 'sunEl', 'sunAz'];
+const controls = {};
+controlIds.forEach(function (id) {
+  const control = document.getElementById(id);
+  const output = document.getElementById(id + 'Out');
+  const listener = function () {
+    output.innerText = control.value;
+    raster.changed();
+  };
+  control.addEventListener('input', listener);
+  control.addEventListener('change', listener);
+  output.innerText = control.value;
+  controls[id] = control;
+});
+
+raster.on('beforeoperations', function (event) {
+  // the event.data object will be passed to operations
+  const data = event.data;
+  data.resolution = event.resolution;
+  for (const id in controls) {
+    data[id] = Number(controls[id].value);
   }
 });

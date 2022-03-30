@@ -35,12 +35,14 @@ const terraLayer = new ImageLayer({
 });
 
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
-const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
-const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
-const grandCanyonUSA = fromLonLat([-118.12954343868806, 34.22960585491841])
-const pikPobedy = fromLonLat([80.129257551509, 42.03767896555761])
-const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
 const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
+const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
+const mtDenali = fromLonLat([-151.00726915968875,63.069268194834244])
+const pikPobedy = fromLonLat([80.129257551509, 42.03767896555761])
+const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
+const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
+const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
+const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
 const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 var ctrInterval = 100;
@@ -135,12 +137,20 @@ onClick('fly-to-everest', function() {
   flyTo(mtEverest, function() {});
 });
 
+onClick('fly-to-kilimanjaro', function() {
+  flyTo(mtKilimanjaro, function() {});
+});
+
 onClick('fly-to-katoomba', function() {
   flyTo(katoomba, function() {});
 });
 
-onClick('fly-to-grand-canyon', function() {
-  flyTo(grandCanyonUSA, function() {});
+onClick('fly-to-denali', function() {
+  flyTo(mtDenali, function() {});
+});
+
+onClick('fly-to-cordillera', function() {
+  flyTo(cordilleraBlanca, function() {});
 });
 
 onClick('fly-to-pik-pobedy', function() {

@@ -10,11 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"log"
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -28,6 +30,7 @@ import (
 	"github.com/paulmach/orb/maptile"
 	"github.com/paulmach/orb/simplify"
 	"github.com/spf13/cobra"
+	"github.com/valri11/surfacemap/slippymath"
 
 	"github.com/fogleman/colormap"
 	"github.com/fogleman/contourmap"
@@ -60,8 +63,12 @@ const (
 	awsRegion   = "us-east-1"
 )
 
-const CacheSize = 500
-const TileSize = 256
+const (
+	CacheSize = 500
+	TileSize  = 256
+
+	MaxConcurrency = 8
+)
 
 type FeatureOutFormat string
 
@@ -110,6 +117,7 @@ func mainCmd(cmd *cobra.Command, args []string) {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/terra/{z}/{x}/{y}.img", t.tilesHandler)
+	r.HandleFunc("/terrain/{z}/{x}/{y}.img", t.tilesTerrainHandler)
 	r.HandleFunc("/contours/{z}/{x}/{y}.{format}", t.tilesContoursHandler)
 
 	// Where ORIGIN_ALLOWED is like `scheme://dns[:port]`, or `*` (insecure)
@@ -207,6 +215,116 @@ func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
+func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+
+	log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+
+	z, err := strconv.Atoi(vars["z"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	x, err := strconv.Atoi(vars["x"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	y, err := strconv.Atoi(vars["y"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	//oName := fmt.Sprintf("v2/normal/%d/%d/%d.png", z, x, y)
+	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", z, x, y)
+
+	var buf *bytes.Buffer
+	// cache lookup
+	dt1 := time.Now()
+	if h.tileCache.Contains(oName) {
+		obj, ok := h.tileCache.Get(oName)
+		if !ok {
+			http.Error(w, "cache error", http.StatusBadRequest)
+			return
+		}
+
+		cacheData, ok := obj.([]byte)
+		if !ok {
+			http.Error(w, "cache error", http.StatusBadRequest)
+			return
+		}
+		buf = bytes.NewBuffer(cacheData)
+
+		dt2 := time.Now()
+		log.Printf("Cache hit: %s, read: %d in %v", oName, buf.Len(), dt2.Sub(dt1))
+	} else {
+		s3Client := s3.NewFromConfig(h.cfg)
+		goi := &s3.GetObjectInput{
+			Bucket: aws.String(h.s3Config.bucket),
+			Key:    aws.String(oName),
+		}
+
+		goo, err := s3Client.GetObject(ctx, goi)
+		if err != nil {
+			log.Printf("req: %s, ERR: %v", oName, err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		buf = new(bytes.Buffer)
+		buf.ReadFrom(goo.Body)
+		dRead := buf.Len()
+
+		goo.Body.Close()
+		// add cache entry
+		cacheData := make([]byte, buf.Len())
+		copy(cacheData, buf.Bytes())
+		h.tileCache.Add(oName, cacheData)
+
+		dt2 := time.Now()
+		log.Printf("S3 GetObject: %s, read: %d in %v", oName, dRead, dt2.Sub(dt1))
+	}
+	w.Header().Set("Content-Type", "image/png")
+
+	dt1 = time.Now()
+	pixel_res, err := slippymath.TilePixelResolution(uint32(z), float64(x), float64(y))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	h_factor := 1.0
+	altitude := 45.0
+	azimuth := 315.0
+	imgOut, err := HillshadeImage(img, pixel_res, h_factor, altitude, azimuth)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	dt2 := time.Now()
+	log.Printf("Hillshade completed in %v", dt2.Sub(dt1))
+
+	buf = new(bytes.Buffer)
+	err = png.Encode(buf, imgOut)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	out := buf.Bytes()
+
+	w.Write(out)
+}
+
 func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -280,6 +398,8 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			data := bytes.NewBuffer(cacheData)
+
+			dRead += data.Len()
 			tiles[idx] = data
 
 			dtRead2 := time.Now()
@@ -303,7 +423,6 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 			data.ReadFrom(goo.Body)
 
 			dRead += data.Len()
-
 			tiles[idx] = data
 
 			// add cache entry
@@ -335,11 +454,7 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		for y := 0; y < TileSize; y++ {
 			for x := 0; x < TileSize; x++ {
 				dr, dg, db, da := img.At(x, y).RGBA()
-				dr &= 0xff
-				dg &= 0xff
-				db &= 0xff
-				da &= 0xff
-				h := rgbaToHeight(uint16(dr), uint16(dg), uint16(db), uint16(da))
+				h := rgbaToHeight(dr, dg, db, da)
 
 				idxH := 0
 				if idx == 0 {
@@ -390,7 +505,9 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 			ls := orb.LineString{}
 			for _, point := range contour {
 
-				lon, lat := toGeo(float64((tile_X-1)*TileSize)+point.X, float64((tile_Y-1)*TileSize)+point.Y, uint32(zoom+8))
+				lon, lat := slippymath.TileToLonLat(
+					uint32(zoom+8),
+					float64((tile_X-1)*TileSize)+point.X, float64((tile_Y-1)*TileSize)+point.Y)
 				pt := orb.Point{lon, lat}
 				ls = append(ls, pt)
 			}
@@ -486,7 +603,55 @@ func transformToColormap(data []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func rgbaToHeight(r uint16, g uint16, b uint16, a uint16) float64 {
+func transformToSunshade(data []byte) ([]byte, error) {
+	im, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	m := contourmap.FromImage(im).Closed()
+	z0 := m.Min
+	z1 := m.Max
+
+	imw := int(float64(m.W) * Scale)
+	imh := int(float64(m.H) * Scale)
+
+	dc := gg.NewContext(imw, imh)
+	dc.SetRGB(1, 1, 1)
+	dc.SetColor(colormap.ParseColor(Background))
+	dc.Clear()
+	dc.Scale(Scale, Scale)
+
+	pal := colormap.New(colormap.ParseColors(Palette))
+	for i := 0; i < N; i++ {
+		t := float64(i) / (N - 1)
+		z := z0 + (z1-z0)*t
+		contours := m.Contours(z + 1e-9)
+		for _, c := range contours {
+			dc.NewSubPath()
+			for _, p := range c {
+				dc.LineTo(p.X, p.Y)
+			}
+		}
+		dc.SetColor(pal.At(t))
+		dc.FillPreserve()
+		dc.SetRGB(0, 0, 0)
+		dc.SetLineWidth(1)
+		dc.Stroke()
+	}
+
+	out := new(bytes.Buffer)
+	png.Encode(out, dc.Image())
+
+	return out.Bytes(), nil
+}
+
+func rgbaToHeight(r uint32, g uint32, b uint32, a uint32) float64 {
+
+	r &= 0xff
+	g &= 0xff
+	b &= 0xff
+
 	// (red * 256 + green + blue / 256) - 32768
 	h := float64(r*256 + g)
 	h += float64(b) / 256
@@ -494,11 +659,148 @@ func rgbaToHeight(r uint16, g uint16, b uint16, a uint16) float64 {
 	return h
 }
 
-func toGeo(x, y float64, level uint32) (lng, lat float64) {
-	maxtiles := float64(uint64(1 << level))
+func HillshadeImage(img image.Image,
+	pixel_res float64,
+	h_factor float64,
+	altitude float64,
+	azimuth float64) (image.Image, error) {
 
-	lng = 360.0 * (x/maxtiles - 0.5)
-	lat = 2.0*math.Atan(math.Exp(math.Pi-(2*math.Pi)*(y/maxtiles)))*(180.0/math.Pi) - 90.0
+	//h_factor := 1.0
+	//altitude := 45.0
+	//azimuth := 315.0
 
-	return lng, lat
+	zenith_deg := 90.0 - altitude
+	zenith_rad := zenith_deg * math.Pi / 180.0
+
+	cosZenithRad := math.Cos(zenith_rad)
+	sinZenithRad := math.Sin(zenith_rad)
+
+	azimuth_math := 360.0 - azimuth + 90.0
+	azimuth_rad := azimuth_math * math.Pi / 180.0
+
+	// a d g
+	// b e h
+	// c f i
+
+	// dz/dx = ((c + 2f + i) - (a + 2d + g)) / (8 * pixel_res)
+	// dz/dy = ((g + 2h + i) - (a + 2b + c))/ (8 * pixel_res)
+	//
+	// slope = atan(z_factor * sqrt((dz/dx)^2 + (dz/dy)^2))
+	// aspect = atan2(dz/dy, -dz/dx)
+	//
+	// shaded relief = 255 * ((cos(90 - altitude) * cos(slope))
+	// 		+ (sin(90 - altitude) * sin(slope) * cos(azimuth – aspect)))
+	//
+	// If [dz/dx] is non-zero:
+	//   Aspect_rad = atan2 ([dz/dy], -[dz/dx])
+	//     if Aspect_rad < 0 then
+	//     	Aspect_rad = 2 * pi + Aspect_rad
+	//   If [dz/dx] is zero:
+	//     if [dz/dy] > 0 then
+	//       Aspect_rad = pi / 2
+	//     else if [dz/dy] < 0 then
+	//       Aspect_rad = 2 * pi - pi / 2
+	//     else
+	//       Aspect_rad = Aspect_rad
+
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	getHeightAtPixel := func(img image.Image, x int, y int) float64 {
+		dr, dg, db, da := img.At(x, y).RGBA()
+		h := rgbaToHeight(dr, dg, db, da)
+		return h
+	}
+
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{width, height}
+
+	imgOut := image.NewGray(image.Rectangle{upLeft, lowRight})
+
+	var wg sync.WaitGroup
+	sem := make(chan bool, MaxConcurrency)
+
+	// a(-1,-1) d(0,-1) g(1,-1)
+	// b(-1,0) e(0,0) h(1,0)
+	// c(-1,1) f(0,1) i(1,1)
+	for y := 1; y < height-1; y++ {
+
+		wg.Add(1)
+		sem <- true
+
+		y := y
+
+		go func() {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+
+			for x := 1; x < width-1; x++ {
+
+				a := getHeightAtPixel(img, x-1, y-1)
+				b := getHeightAtPixel(img, x-1, y)
+				c := getHeightAtPixel(img, x-1, y+1)
+				d := getHeightAtPixel(img, x, y-1)
+				f := getHeightAtPixel(img, x, y+1)
+				g := getHeightAtPixel(img, x+1, y-1)
+				h := getHeightAtPixel(img, x+1, y)
+				i := getHeightAtPixel(img, x+1, y+1)
+
+				dz_dx := ((c + 2*f + i) - (a + 2*d + g)) / (8 * pixel_res)
+				dz_dy := ((g + 2*h + i) - (a + 2*b + c)) / (8 * pixel_res)
+
+				slope_rad := math.Atan(h_factor * math.Sqrt(dz_dx*dz_dx+dz_dy*dz_dy))
+
+				var aspect_rad float64
+				if dz_dx != 0.0 {
+					aspect_rad = math.Atan2(dz_dy, -dz_dx)
+					if aspect_rad < 0.0 {
+						aspect_rad += 2 * math.Pi
+					}
+				} else {
+					if dz_dy > 0 {
+						aspect_rad = math.Pi / 2
+					} else if dz_dy < 0.0 {
+						aspect_rad = 2*math.Pi - math.Pi/2
+					}
+				}
+
+				hillshade := math.Floor(255.0 * ((cosZenithRad * math.Cos(slope_rad)) +
+					(sinZenithRad * math.Sin(slope_rad) * math.Cos(azimuth_rad-aspect_rad))))
+				if hillshade < 0 {
+					hillshade = 0
+				}
+
+				col := color.Gray{uint8(hillshade)}
+				imgOut.Set(x, y, col)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// fixup artefacts along lines - copy shade from neighbour
+	y := 0
+	for x := 0; x < width; x++ {
+		col := imgOut.At(x, y+1)
+		imgOut.Set(x, y, col)
+	}
+	y = height - 1
+	for x := 0; x < width; x++ {
+		col := imgOut.At(x, y-1)
+		imgOut.Set(x, y, col)
+	}
+	x := 0
+	for y := 0; y < height; y++ {
+		col := imgOut.At(x+1, y)
+		imgOut.Set(x, y, col)
+	}
+	x = width - 1
+	for y := 0; y < height; y++ {
+		col := imgOut.At(x-1, y)
+		imgOut.Set(x, y, col)
+	}
+
+	return imgOut, nil
 }

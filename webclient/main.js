@@ -5,7 +5,7 @@ import {Tile as TileLayer, VectorTile as VectorTileLayer, Image as ImageLayer} f
 import {TileDebug, OSM, XYZ, VectorTile, Raster} from 'ol/source';
 import {GeoJSON, MVT} from 'ol/format';
 import {createStringXY} from 'ol/coordinate';
-import {fromLonLat} from 'ol/proj';
+import {fromLonLat, getPointResolution} from 'ol/proj';
 import Overlay from 'ol/Overlay';
 import {Fill, Stroke, Style, Text} from 'ol/style';
 import {createXYZ} from 'ol/tilegrid';
@@ -18,9 +18,23 @@ const config = {
     }
 };
 
+// hillshade images
+const sourceTerrain = new XYZ({
+  url: 'http://' + config.contours.host + ':' + config.contours.port + '/terrain/{z}/{x}/{y}.img',
+  crossOrigin: 'anonymous',
+  tileGrid: createXYZ({
+    minZoom: 6,
+    maxZoom: 15
+  }),
+});
+
 const sourceTerra = new XYZ({
   url: 'http://' + config.contours.host + ':' + config.contours.port + '/terra/{z}/{x}/{y}.img',
   crossOrigin: 'anonymous',
+  tileGrid: createXYZ({
+    minZoom: 6,
+    maxZoom: 15
+  }),
 });
 
 const raster = new Raster({
@@ -34,6 +48,26 @@ const terraLayer = new ImageLayer({
   source: raster,
 });
 
+const debugLayer = new TileLayer({
+    source: new TileDebug({
+        projection: 'EPSG:3857',
+        tileGrid: createXYZ({
+        maxZoom: 21
+        })
+  })
+});
+
+const hillshadeLayer = new TileLayer({
+  source: sourceTerrain,
+  opacity: 0.3,
+});
+
+const basemapLayer = new TileLayer({
+    source: new OSM()
+});
+
+
+
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
 const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
 const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
@@ -43,6 +77,7 @@ const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
 const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
 const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
 const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
+const grandCanyon = fromLonLat([-112.09523569822798,36.10031704536186])
 const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 var ctrInterval = 100;
@@ -88,6 +123,10 @@ const contoursLayer = new VectorTileLayer({
     //format: new GeoJSON()
     url: getContoursUrl(ctrInterval),
     format: new MVT(),
+    tileGrid: createXYZ({
+        minZoom: 6,
+        maxZoom: 15
+    }),
     attributions: ['<br>Contours derived from: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Licence</a>'],
   }),
   style: function (feature) {
@@ -98,15 +137,6 @@ const contoursLayer = new VectorTileLayer({
   declutter: true,
 });
 
-const debugLayer = new TileLayer({
-    source: new TileDebug({
-        projection: 'EPSG:3857',
-        tileGrid: createXYZ({
-        maxZoom: 21
-        })
-  })
-});
-
 const attribution = new Attribution({
   collapsible: false,
 });
@@ -114,12 +144,11 @@ const attribution = new Attribution({
 const map = new Map({
   target: 'map',
   layers: [
-    new TileLayer({
-      source: new OSM()
-    }),
+    basemapLayer,
     debugLayer,
     contoursLayer,
-    terraLayer
+    terraLayer,
+    hillshadeLayer
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -153,6 +182,10 @@ onClick('fly-to-cordillera', function() {
   flyTo(cordilleraBlanca, function() {});
 });
 
+onClick('fly-to-grand-canyon', function() {
+  flyTo(grandCanyon, function() {});
+});
+
 onClick('fly-to-pik-pobedy', function() {
   flyTo(pikPobedy, function() {});
 });
@@ -178,6 +211,7 @@ function flyTo(location, done) {
   function callback(complete) {
     contoursLayer.setVisible(false);
     terraLayer.setVisible(false);
+    hillshadeLayer.setVisible(false);
     --parts;
     if (called) {
       return;
@@ -188,6 +222,8 @@ function flyTo(location, done) {
       contoursLayer.setVisible(v1);
       var v2 = document.getElementById("checkbox-terra").checked
       terraLayer.setVisible(v2);
+      var v3 = document.getElementById("checkbox-hillshade").checked
+      hillshadeLayer.setVisible(v3);
       done(complete);
     }
   }
@@ -223,11 +259,19 @@ map.on('pointermove', function(evt) {
     console.log(JSON.stringify(properties["elevation"]));
 
     var info = document.getElementById('mouse-position');
-    info.innerHTML = '<pre>'
-    info.innerHTML += 'Elevation: ' + JSON.stringify(properties["elevation"])
-    info.innerHTML += ', '
-    info.innerHTML += 'Contour interval: ' + ctrInterval + 'm';
-    info.innerHTML += '</pre>'
+    var infoText = '<pre>';
+    infoText += 'Elevation: ' + JSON.stringify(properties["elevation"])
+    infoText += ', '
+    infoText += 'Contour interval: ' + ctrInterval + 'm';
+
+    var view = map.getView();
+    var coords = view.getCenter();
+    var resolution = view.getResolution();
+    var projection = view.getProjection();
+    var resolutionAtCoords = getPointResolution(projection, resolution, coords);
+    infoText += ' . Resolution: ' + resolutionAtCoords.toFixed(2) + 'm';
+    infoText += '</pre>';
+    info.innerHTML = infoText;
 
     var coordinate = evt.coordinate;
 
@@ -276,13 +320,18 @@ $("#slider-id").slider({
         ctrInterval = ui.value;
 
         var info = document.getElementById('mouse-position');
-        info.innerHTML = '<pre>'
-        info.innerHTML += 'Contour interval: ' + ctrInterval + 'm';
-        info.innerHTML += '</pre>'
+        var infoText = '<pre>';
+        infoText += 'Contour interval: ' + ctrInterval + 'm';
+        infoText += '</pre>'
+        info.innerHTML = infoText;
 
         let url = getContoursUrl(ctrInterval);
         contoursLayer.getSource().setUrl(url);
     }
+});
+
+document.getElementById("checkbox-basemap").addEventListener('change', function() {
+  basemapLayer.setVisible(this.checked);
 });
 
 document.getElementById("checkbox-contours").addEventListener('change', function() {
@@ -295,6 +344,10 @@ document.getElementById("checkbox-contours").addEventListener('change', function
 
 document.getElementById("checkbox-terra").addEventListener('change', function() {
   terraLayer.setVisible(this.checked);
+});
+
+document.getElementById("checkbox-hillshade").addEventListener('change', function() {
+  hillshadeLayer.setVisible(this.checked);
 });
 
 var showDebug = document.getElementById("checkbox-debug").checked
@@ -445,3 +498,12 @@ raster.on('beforeoperations', function (event) {
     data[id] = Number(controls[id].value);
   }
 });
+
+document.getElementById("checkbox-basemap").checked = true;
+document.getElementById("checkbox-contours").checked = true;
+document.getElementById("checkbox-terra").checked = false;
+document.getElementById("checkbox-hillshade").checked = true;
+basemapLayer.setVisible(true);
+contoursLayer.setVisible(true);
+terraLayer.setVisible(false);
+hillshadeLayer.setVisible(true);

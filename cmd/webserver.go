@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/draw"
 	"image/png"
 	"log"
 	"math"
@@ -30,11 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/valri11/surfacemap/slippymath"
 
-	"github.com/fogleman/colormap"
 	"github.com/fogleman/contourmap"
-	"github.com/fogleman/gg"
-
-	lrucache "github.com/hashicorp/golang-lru"
 )
 
 const (
@@ -62,8 +59,10 @@ const (
 )
 
 const (
-	CacheSize = 500
+	CacheSize = 512
 	TileSize  = 256
+
+	epsilon = 0.00001
 
 	MaxConcurrency = 8
 )
@@ -72,7 +71,7 @@ type FeatureOutFormat string
 
 const (
 	FeatureOutGeoJSON FeatureOutFormat = "geojson"
-	FeatureOutMVT                      = "mvt"
+	FeatureOutMVT     FeatureOutFormat = "mvt"
 )
 
 type s3Config struct {
@@ -81,20 +80,42 @@ type s3Config struct {
 }
 
 type terra struct {
-	cfg       aws.Config
-	s3Config  s3Config
-	tileCache *lrucache.Cache
+	cfg                aws.Config
+	s3Config           s3Config
+	s3Client           *s3.Client
+	s3TileStore        *S3TileStore
+	cacheTileStore     *CacheTileStore
+	elevationTileStore *ElevationTileStore
 }
 
 func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
-	tileCache, err := lrucache.New(CacheSize)
+
+	s3Client := s3.NewFromConfig(cfg)
+
+	tileNameTempl := "v2/terrarium/%d/%d/%d.png"
+
+	s3TileStore, err := NewS3TileStore(s3Client, s3Config.bucket, tileNameTempl)
 	if err != nil {
 		return nil, err
 	}
+
+	cacheTileStore, err := NewCacheTileStore(tileNameTempl, CacheSize)
+	if err != nil {
+		return nil, err
+	}
+
+	elevationTileStore, err := NewElevationTileStore(tileNameTempl, CacheSize)
+	if err != nil {
+		return nil, err
+	}
+
 	t := terra{
-		cfg:       cfg,
-		s3Config:  s3Config,
-		tileCache: tileCache,
+		cfg:                cfg,
+		s3Config:           s3Config,
+		s3Client:           s3Client,
+		s3TileStore:        s3TileStore,
+		cacheTileStore:     cacheTileStore,
+		elevationTileStore: elevationTileStore,
 	}
 	return &t, nil
 }
@@ -150,65 +171,16 @@ func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//oName := fmt.Sprintf("v2/normal/%d/%d/%d.png", z, x, y)
-	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", z, x, y)
-
-	var buf *bytes.Buffer
-	// cache lookup
-	dt1 := time.Now()
-	if h.tileCache.Contains(oName) {
-		obj, ok := h.tileCache.Get(oName)
-		if !ok {
-			http.Error(w, "cache error", http.StatusBadRequest)
-			return
-		}
-
-		cacheData, ok := obj.([]byte)
-		if !ok {
-			http.Error(w, "cache error", http.StatusBadRequest)
-			return
-		}
-		buf = bytes.NewBuffer(cacheData)
-
-		dt2 := time.Now()
-		log.Printf("Cache hit: %s, read: %d in %v", oName, buf.Len(), dt2.Sub(dt1))
-	} else {
-		s3Client := s3.NewFromConfig(h.cfg)
-		goi := &s3.GetObjectInput{
-			Bucket: aws.String(h.s3Config.bucket),
-			Key:    aws.String(oName),
-		}
-
-		goo, err := s3Client.GetObject(ctx, goi)
-		if err != nil {
-			log.Printf("req: %s, ERR: %v", oName, err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		buf = new(bytes.Buffer)
-		buf.ReadFrom(goo.Body)
-		dRead := buf.Len()
-
-		goo.Body.Close()
-		// add cache entry
-		cacheData := make([]byte, buf.Len())
-		copy(cacheData, buf.Bytes())
-		h.tileCache.Add(oName, cacheData)
-
-		dt2 := time.Now()
-		log.Printf("S3 GetObject: %s, read: %d in %v", oName, dRead, dt2.Sub(dt1))
+	buf, err := h.getTile(ctx, z, x, y)
+	if err != nil {
+		log.Printf("req: ERR: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
 	w.Header().Set("Content-Type", "image/png")
 
 	out := buf.Bytes()
-
-	//	out, err := transformToColormap(buf.Bytes())
-	//	if err != nil {
-	//		log.Printf("req: %s, ERR: %v", oName, err)
-	//		http.Error(w, err.Error(), http.StatusBadRequest)
-	//		return
-	//	}
 
 	w.Write(out)
 }
@@ -236,58 +208,16 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//oName := fmt.Sprintf("v2/normal/%d/%d/%d.png", z, x, y)
-	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", z, x, y)
-
-	var buf *bytes.Buffer
-	// cache lookup
-	dt1 := time.Now()
-	if h.tileCache.Contains(oName) {
-		obj, ok := h.tileCache.Get(oName)
-		if !ok {
-			http.Error(w, "cache error", http.StatusBadRequest)
-			return
-		}
-
-		cacheData, ok := obj.([]byte)
-		if !ok {
-			http.Error(w, "cache error", http.StatusBadRequest)
-			return
-		}
-		buf = bytes.NewBuffer(cacheData)
-
-		dt2 := time.Now()
-		log.Printf("Cache hit: %s, read: %d in %v", oName, buf.Len(), dt2.Sub(dt1))
-	} else {
-		s3Client := s3.NewFromConfig(h.cfg)
-		goi := &s3.GetObjectInput{
-			Bucket: aws.String(h.s3Config.bucket),
-			Key:    aws.String(oName),
-		}
-
-		goo, err := s3Client.GetObject(ctx, goi)
-		if err != nil {
-			log.Printf("req: %s, ERR: %v", oName, err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		buf = new(bytes.Buffer)
-		buf.ReadFrom(goo.Body)
-		dRead := buf.Len()
-
-		goo.Body.Close()
-		// add cache entry
-		cacheData := make([]byte, buf.Len())
-		copy(cacheData, buf.Bytes())
-		h.tileCache.Add(oName, cacheData)
-
-		dt2 := time.Now()
-		log.Printf("S3 GetObject: %s, read: %d in %v", oName, dRead, dt2.Sub(dt1))
+	buf, err := h.getTile(ctx, z, x, y)
+	if err != nil {
+		log.Printf("req: ERR: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
 	w.Header().Set("Content-Type", "image/png")
 
-	dt1 = time.Now()
+	dt1 := time.Now()
 	pixel_res, err := slippymath.TilePixelResolution(uint32(z), float64(x), float64(y))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -326,133 +256,38 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	vars := mux.Vars(r)
-
-	outFormat := FeatureOutFormat(vars["format"])
-	switch outFormat {
-	case FeatureOutGeoJSON, FeatureOutMVT:
-	default:
-		err := errors.New("unsupported output format")
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	vars, outFormat, interval, lvlInterval, zoom, tile_X, tile_Y, shouldReturn := h.getRequestContourParams(r, w)
+	if shouldReturn {
 		return
 	}
-
-	interval := "100"
-	intervals, ok := r.URL.Query()["interval"]
-	if ok {
-		interval = intervals[0]
-	}
-	iLvl, err := strconv.Atoi(interval)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	lvlInterval := float64(iLvl)
 
 	log.Printf("Contours params: z=%v, x=%v, y=%v, interval=%s\n",
 		vars["z"], vars["x"], vars["y"], interval)
 
-	zoom, err := strconv.Atoi(vars["z"])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	tile_X, err := strconv.Atoi(vars["x"])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	tile_Y, err := strconv.Atoi(vars["y"])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X, tile_Y)
 
-	s3Client := s3.NewFromConfig(h.cfg)
 	// request surrounding tiles
 
 	steps := [9][2]int{{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {0, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
 
-	tiles := make([]*bytes.Buffer, 9)
+	dtStart := time.Now()
 
-	dRead := 0
 	dt1 := time.Now()
-	for idx, d := range steps {
-		oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X+d[0], tile_Y+d[1])
-
-		// cache lookup
-		if h.tileCache.Contains(oName) {
-			dtRead1 := time.Now()
-			obj, ok := h.tileCache.Get(oName)
-			if !ok {
-				http.Error(w, "cache error", http.StatusBadRequest)
-				return
-			}
-
-			cacheData, ok := obj.([]byte)
-			if !ok {
-				http.Error(w, "cache error", http.StatusBadRequest)
-				return
-			}
-
-			data := bytes.NewBuffer(cacheData)
-
-			dRead += data.Len()
-			tiles[idx] = data
-
-			dtRead2 := time.Now()
-			log.Printf("Cache hit: %s, read: %d in %v", oName, data.Len(), dtRead2.Sub(dtRead1))
-		} else {
-			dtRead1 := time.Now()
-
-			goi := &s3.GetObjectInput{
-				Bucket: aws.String(h.s3Config.bucket),
-				Key:    aws.String(oName),
-			}
-
-			goo, err := s3Client.GetObject(ctx, goi)
-			if err != nil {
-				log.Printf("req: %s, ERR: %v", oName, err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			data := new(bytes.Buffer)
-			data.ReadFrom(goo.Body)
-
-			dRead += data.Len()
-			tiles[idx] = data
-
-			// add cache entry
-			cacheData := make([]byte, data.Len())
-			copy(cacheData, data.Bytes())
-			h.tileCache.Add(oName, cacheData)
-
-			goo.Body.Close()
-
-			dtRead2 := time.Now()
-			log.Printf("S3 GetObject: %s, read: %d in %v", oName, data.Len(), dtRead2.Sub(dtRead1))
-		}
-	}
-	dt2 := time.Now()
-
-	log.Printf("read %d bytes in %v\n", dRead, dt2.Sub(dt1))
 
 	data := make([]float64, 9*TileSize*TileSize)
 
 	for idx := 0; idx < 9; idx++ {
-		buf := tiles[idx]
-		img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
+
+		elevTile, err := h.getElevationTile(ctx, zoom, tile_X+steps[idx][0], tile_Y+steps[idx][1])
 		if err != nil {
-			log.Printf("req: ERR: %v", err)
+			log.Printf("req: %s, ERR: %v", oName, err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		for y := 0; y < TileSize; y++ {
 			for x := 0; x < TileSize; x++ {
-				dr, dg, db, da := img.At(x, y).RGBA()
-				h := rgbaToHeight(dr, dg, db, da)
+				h := elevTile[y*TileSize+x]
 
 				idxH := 0
 				if idx == 0 {
@@ -488,7 +323,29 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	m := contourmap.FromFloat64s(3*TileSize, 3*TileSize, data)
+	dt2 := time.Now()
+	log.Printf("decoded images %v\n", dt2.Sub(dt1))
+
+	const off_px = 3
+
+	width := TileSize + 2*off_px
+	height := TileSize + 2*off_px
+
+	windowedData := make([]float64, width*height)
+
+	startX := TileSize - off_px
+	startY := TileSize - off_px
+
+	w_idx := 0
+	for dt_y := 0; dt_y < height; dt_y++ {
+		for dt_x := 0; dt_x < width; dt_x++ {
+			dt_idx := (startY+dt_y)*3*TileSize + dt_x + startX
+			windowedData[w_idx] = data[dt_idx]
+			w_idx++
+		}
+	}
+
+	m := contourmap.FromFloat64s(width, height, windowedData)
 
 	z0 := m.Min
 	z1 := m.Max
@@ -500,14 +357,17 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	for zLevel <= z1 {
 		contours := m.Contours(zLevel)
 		for _, contour := range contours {
-			ls := orb.LineString{}
-			for _, point := range contour {
+			ls := make(orb.LineString, len(contour))
+			for idx, point := range contour {
+
+				px := point.X - off_px
+				py := point.Y - off_px
 
 				lon, lat := slippymath.TileToLonLat(
 					uint32(zoom+8),
-					float64((tile_X-1)*TileSize)+point.X, float64((tile_Y-1)*TileSize)+point.Y)
+					float64(tile_X*TileSize)+px, float64(tile_Y*TileSize)+py)
 				pt := orb.Point{lon, lat}
-				ls = append(ls, pt)
+				ls[idx] = pt
 			}
 			if len(ls) == 0 {
 				continue
@@ -520,6 +380,7 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var out []byte
+	var err error
 
 	if outFormat == FeatureOutGeoJSON {
 		out, err = fc.MarshalJSON()
@@ -555,93 +416,140 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/vnd.mapbox-vector-tile")
 	}
 
+	dt2 = time.Now()
+	log.Printf("Contour completed in %v\n", dt2.Sub(dtStart))
+
 	w.Write(out)
 }
 
-func transformToColormap(data []byte) ([]byte, error) {
-	im, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
+func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (*bytes.Buffer, error) {
+	cacheData, err := h.cacheTileStore.GetTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
+
+	var tile *bytes.Buffer
+	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X, tile_Y)
+	dt1 := time.Now()
+
+	if err == nil {
+		tile = bytes.NewBuffer(cacheData)
+
+		dt2 := time.Now()
+		log.Printf("Cache hit: %s, read: %d in %v", oName, tile.Len(), dt2.Sub(dt1))
+	} else if err == ErrTileNotFound {
+
+		s3Data, err := h.s3TileStore.GetTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
+		if err != nil {
+			return nil, err
+		}
+
+		tile = bytes.NewBuffer(s3Data)
+
+		cacheData := make([]byte, tile.Len())
+		copy(cacheData, tile.Bytes())
+		h.cacheTileStore.Add(uint32(zoom), uint32(tile_X), uint32(tile_Y), cacheData)
+
+		dt2 := time.Now()
+		log.Printf("S3 GetObject: %s, read: %d in %v", oName, len(cacheData), dt2.Sub(dt1))
+	} else {
+
 		return nil, err
 	}
-
-	m := contourmap.FromImage(im).Closed()
-	z0 := m.Min
-	z1 := m.Max
-
-	imw := int(float64(m.W) * Scale)
-	imh := int(float64(m.H) * Scale)
-
-	dc := gg.NewContext(imw, imh)
-	dc.SetRGB(1, 1, 1)
-	dc.SetColor(colormap.ParseColor(Background))
-	dc.Clear()
-	dc.Scale(Scale, Scale)
-
-	pal := colormap.New(colormap.ParseColors(Palette))
-	for i := 0; i < N; i++ {
-		t := float64(i) / (N - 1)
-		z := z0 + (z1-z0)*t
-		contours := m.Contours(z + 1e-9)
-		for _, c := range contours {
-			dc.NewSubPath()
-			for _, p := range c {
-				dc.LineTo(p.X, p.Y)
-			}
-		}
-		dc.SetColor(pal.At(t))
-		dc.FillPreserve()
-		dc.SetRGB(0, 0, 0)
-		dc.SetLineWidth(1)
-		dc.Stroke()
-	}
-
-	out := new(bytes.Buffer)
-	png.Encode(out, dc.Image())
-
-	return out.Bytes(), nil
+	return tile, nil
 }
 
-func transformToSunshade(data []byte) ([]byte, error) {
-	im, _, err := image.Decode(bytes.NewReader(data))
+func (h *terra) getElevationTile(ctx context.Context, zoom int, tile_X int, tile_Y int) ([]float64, error) {
+	dt1 := time.Now()
+
+	elevData, err := h.elevationTileStore.GetTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
+	if err == nil {
+		dt2 := time.Now()
+		log.Printf("Cache hit: %d_%d_%d, read elevation data in %v", zoom, tile_X, tile_Y, dt2.Sub(dt1))
+
+		return elevData, nil
+	} else if err != ErrTileNotFound {
+		return nil, err
+	}
+
+	dt1 = time.Now()
+
+	tile, err := h.getTile(ctx, zoom, tile_X, tile_Y)
 	if err != nil {
 		return nil, err
 	}
 
-	m := contourmap.FromImage(im).Closed()
-	z0 := m.Min
-	z1 := m.Max
-
-	imw := int(float64(m.W) * Scale)
-	imh := int(float64(m.H) * Scale)
-
-	dc := gg.NewContext(imw, imh)
-	dc.SetRGB(1, 1, 1)
-	dc.SetColor(colormap.ParseColor(Background))
-	dc.Clear()
-	dc.Scale(Scale, Scale)
-
-	pal := colormap.New(colormap.ParseColors(Palette))
-	for i := 0; i < N; i++ {
-		t := float64(i) / (N - 1)
-		z := z0 + (z1-z0)*t
-		contours := m.Contours(z + 1e-9)
-		for _, c := range contours {
-			dc.NewSubPath()
-			for _, p := range c {
-				dc.LineTo(p.X, p.Y)
-			}
-		}
-		dc.SetColor(pal.At(t))
-		dc.FillPreserve()
-		dc.SetRGB(0, 0, 0)
-		dc.SetLineWidth(1)
-		dc.Stroke()
+	data := make([]float64, TileSize*TileSize)
+	img, _, err := image.Decode(bytes.NewReader(tile.Bytes()))
+	if err != nil {
+		return nil, err
 	}
 
-	out := new(bytes.Buffer)
-	png.Encode(out, dc.Image())
+	bounds := img.Bounds()
+	rgba := image.NewRGBA(bounds)
+	draw.Draw(rgba, bounds, img, bounds.Min, draw.Src)
 
-	return out.Bytes(), nil
+	idx := 0
+	for y := 0; y < TileSize; y++ {
+		for x := 0; x < TileSize; x++ {
+			pix_idx := (y*TileSize + x) * 4
+			pix := rgba.Pix[pix_idx : pix_idx+4]
+			dr := uint32(pix[0])
+			dg := uint32(pix[1])
+			db := uint32(pix[2])
+			da := uint32(pix[3])
+			h := rgbaToHeight(dr, dg, db, da)
+
+			data[idx] = h
+			idx++
+		}
+	}
+
+	h.elevationTileStore.Add(uint32(zoom), uint32(tile_X), uint32(tile_Y), data)
+
+	dt2 := time.Now()
+	log.Printf("Elevation tile: %d_%d_%d, decode elevation data in %v", zoom, tile_X, tile_Y, dt2.Sub(dt1))
+
+	return data, nil
+}
+
+func (*terra) getRequestContourParams(r *http.Request, w http.ResponseWriter) (map[string]string, FeatureOutFormat, string, float64, int, int, int, bool) {
+	vars := mux.Vars(r)
+
+	outFormat := FeatureOutFormat(vars["format"])
+	switch outFormat {
+	case FeatureOutGeoJSON, FeatureOutMVT:
+	default:
+		err := errors.New("unsupported output format")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, "", "", 0, 0, 0, 0, true
+	}
+
+	interval := "100"
+	intervals, ok := r.URL.Query()["interval"]
+	if ok {
+		interval = intervals[0]
+	}
+	iLvl, err := strconv.Atoi(interval)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, "", "", 0, 0, 0, 0, true
+	}
+	lvlInterval := float64(iLvl)
+
+	zoom, err := strconv.Atoi(vars["z"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, "", "", 0, 0, 0, 0, true
+	}
+	tile_X, err := strconv.Atoi(vars["x"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, "", "", 0, 0, 0, 0, true
+	}
+	tile_Y, err := strconv.Atoi(vars["y"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, "", "", 0, 0, 0, 0, true
+	}
+	return vars, outFormat, interval, lvlInterval, zoom, tile_X, tile_Y, false
 }
 
 func rgbaToHeight(r uint32, g uint32, b uint32, a uint32) float64 {

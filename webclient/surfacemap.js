@@ -1,4 +1,4 @@
-import './main_style.css';
+import './style.css';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import {Tile as TileLayer, VectorTile as VectorTileLayer, Image as ImageLayer} from 'ol/layer';
@@ -28,6 +28,26 @@ const sourceTerrain = new XYZ({
   }),
 });
 
+const sourceTerra = new XYZ({
+  url: 'http://' + config.contours.host + ':' + config.contours.port + '/terra/{z}/{x}/{y}.img',
+  crossOrigin: 'anonymous',
+  tileGrid: createXYZ({
+    minZoom: 6,
+    maxZoom: 15
+  }),
+});
+
+const raster = new Raster({
+  sources: [sourceTerra],
+  operationType: 'image',
+  operation: shade,
+});
+
+const terraLayer = new ImageLayer({
+  opacity: 0.3,
+  source: raster,
+});
+
 const debugLayer = new TileLayer({
     source: new TileDebug({
         projection: 'EPSG:3857',
@@ -46,7 +66,8 @@ const basemapLayer = new TileLayer({
     source: new OSM()
 });
 
-// POI
+
+
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
 const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
 const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
@@ -126,6 +147,7 @@ const map = new Map({
     basemapLayer,
     debugLayer,
     contoursLayer,
+    terraLayer,
     hillshadeLayer
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
@@ -188,6 +210,7 @@ function flyTo(location, done) {
 
   function callback(complete) {
     contoursLayer.setVisible(false);
+    terraLayer.setVisible(false);
     hillshadeLayer.setVisible(false);
     --parts;
     if (called) {
@@ -197,6 +220,8 @@ function flyTo(location, done) {
       called = true;
       var v1 = document.getElementById("checkbox-contours").checked
       contoursLayer.setVisible(v1);
+      var v2 = document.getElementById("checkbox-terra").checked
+      terraLayer.setVisible(v2);
       var v3 = document.getElementById("checkbox-hillshade").checked
       hillshadeLayer.setVisible(v3);
       done(complete);
@@ -315,6 +340,10 @@ document.getElementById("checkbox-contours").addEventListener('change', function
   } else {
     contoursLayer.setVisible(false);
   }
+});
+
+document.getElementById("checkbox-terra").addEventListener('change', function() {
+  terraLayer.setVisible(this.checked);
 });
 
 document.getElementById("checkbox-hillshade").addEventListener('change', function() {
@@ -472,7 +501,9 @@ raster.on('beforeoperations', function (event) {
 
 document.getElementById("checkbox-basemap").checked = true;
 document.getElementById("checkbox-contours").checked = true;
+document.getElementById("checkbox-terra").checked = false;
 document.getElementById("checkbox-hillshade").checked = true;
 basemapLayer.setVisible(true);
 contoursLayer.setVisible(true);
+terraLayer.setVisible(false);
 hillshadeLayer.setVisible(true);

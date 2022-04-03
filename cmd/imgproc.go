@@ -62,8 +62,8 @@ func HillshadeImage(img image.Image,
 		}
 	*/
 	getHeightAtPixel := func(rgba *image.RGBA, x int, y int) float64 {
-		index := (y*width + x) * 4
-		pix := rgba.Pix[index : index+4]
+		pix_idx := (y*width + x) * 4
+		pix := rgba.Pix[pix_idx : pix_idx+4]
 		dr := uint32(pix[0])
 		dg := uint32(pix[1])
 		db := uint32(pix[2])

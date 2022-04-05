@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="https://openlayers.org/favicon.ico" />
+  <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/themes/base/jquery-ui.css" type="text/css" media="all" />
+<script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.5.min.js" type="text/javascript"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/jquery-ui.min.js" type="text/javascript"></script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Surface Map</title>
+</head>
+
+<body>
+  <div id="map" class="map"></div>
+  <div>
+  <input type="checkbox" id="checkbox-debug" name="checkbox-debug">
+  <label for="checkbox-debug">Show debug layer</label>
+  </div>
+  <div>
+  <input type="checkbox" id="checkbox-basemap" name="checkbox-basemap" checked>
+  <label for="checkbox-basemap">Show basemap</label>
+  <input type="checkbox" id="checkbox-contours" name="checkbox-contours" checked>
+  <label for="checkbox-contours">Show contours</label>
+  <input type="checkbox" id="checkbox-terra" name="checkbox-terra" checked>
+  <label for="checkbox-terra">Show terrain</label>
+  <input type="checkbox" id="checkbox-hillshade" name="checkbox-hillshade" checked>
+  <label for="checkbox-hillshade">Show hillshade</label>
+  </div>
+  <div id="slider-id"><div class="ui-slider-handle"></div></div>
+  <button id="fly-to-kg">KG</button>
+  <button id="fly-to-khan-tengri">Khan Tengri</button>
+  <button id="fly-to-pik-pobedy">Pik Pobedy</button>
+  <button id="fly-to-everest">Mt Everest</button>
+  <button id="fly-to-katoomba">Katoomba</button>
+  <button id="fly-to-denali">Mt Denali</button>
+  <button id="fly-to-grand-canyon">Grand Canyon</button>
+  <button id="fly-to-cordillera">Cordillera Blanca</button>
+  <button id="fly-to-kilimanjaro">Mt Kilimanjaro</button>
+  <button id="fly-to-olympus">Olympus</button>
+  <button id="fly-to-mariana">Challenger Deep</button>
+  <div id="popup" class="ol-popup">
+    <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+    <div id="popup-content"></div>
+  </div>
+  <div>
+  <label>
+      Sea level
+      <input id="level" type="range" min="0" max="200" value="1"/>
+      +<span id="output"></span> m
+    </label>
+  </div>
+  <div id="mouse-position"></div>
+  <script type="module" src="./sealevel.js"></script>
+</body>
+
+</html>

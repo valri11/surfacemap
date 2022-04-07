@@ -57,6 +57,7 @@ const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
 const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
 const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
 const grandCanyon = fromLonLat([-112.09523569822798,36.10031704536186])
+const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
 const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 var ctrInterval = 100;
@@ -174,6 +175,10 @@ onClick('fly-to-olympus', function() {
 
 onClick('fly-to-khan-tengri', function() {
   flyTo(khanTengri, function() {});
+});
+
+onClick('fly-to-oahu', function() {
+  flyTo(oahuHawaii, function() {});
 });
 
 onClick('fly-to-mariana', function() {

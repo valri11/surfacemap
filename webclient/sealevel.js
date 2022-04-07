@@ -67,24 +67,19 @@ const sealevelLayer = new ImageLayer({
     source: raster,
 });
 
-const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
-const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
-const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
-const mtDenali = fromLonLat([-151.00726915968875,63.069268194834244])
-const pikPobedy = fromLonLat([80.129257551509, 42.03767896555761])
-const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
-const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
-const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
-const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
-const grandCanyon = fromLonLat([-112.09523569822798,36.10031704536186])
-const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
+
+const newYork = fromLonLat([-74.04442672993127,40.69010807133021])
+const london = fromLonLat([-0.12467245895210548,51.50101981028784])
+const paris = fromLonLat([2.3360465678907536,48.85928539255598])
+const venice = fromLonLat([12.340694942695933,45.43544087127655])
 const operaHouse = fromLonLat([151.2153396126718,-33.85659727934901])
+const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
 
 var ctrInterval = 100;
 
 const view = new View({
   center: operaHouse,
-  zoom: 14
+  zoom: 15
 });
 
 const labelStyle = new Style({
@@ -158,48 +153,28 @@ function onClick(id, callback) {
   document.getElementById(id).addEventListener('click', callback);
 }
 
-onClick('fly-to-kg', function() {
+onClick('fly-to-sydney', function() {
   flyTo(operaHouse, function() {});
 });
 
-onClick('fly-to-everest', function() {
-  flyTo(mtEverest, function() {});
+onClick('fly-to-newyork', function() {
+  flyTo(newYork, function() {});
 });
 
-onClick('fly-to-kilimanjaro', function() {
-  flyTo(mtKilimanjaro, function() {});
+onClick('fly-to-london', function() {
+  flyTo(london, function() {});
 });
 
-onClick('fly-to-katoomba', function() {
-  flyTo(katoomba, function() {});
+onClick('fly-to-paris', function() {
+  flyTo(paris, function() {});
 });
 
-onClick('fly-to-denali', function() {
-  flyTo(mtDenali, function() {});
+onClick('fly-to-venice', function() {
+  flyTo(venice, function() {});
 });
 
-onClick('fly-to-cordillera', function() {
-  flyTo(cordilleraBlanca, function() {});
-});
-
-onClick('fly-to-grand-canyon', function() {
-  flyTo(grandCanyon, function() {});
-});
-
-onClick('fly-to-pik-pobedy', function() {
-  flyTo(pikPobedy, function() {});
-});
-
-onClick('fly-to-olympus', function() {
-  flyTo(mtOlympus, function() {});
-});
-
-onClick('fly-to-khan-tengri', function() {
-  flyTo(khanTengri, function() {});
-});
-
-onClick('fly-to-mariana', function() {
-  flyTo(challengerDeep, function() {});
+onClick('fly-to-hawaii', function() {
+  flyTo(oahuHawaii, function() {});
 });
 
 function flyTo(location, done) {
@@ -219,7 +194,6 @@ function flyTo(location, done) {
       called = true;
       var v1 = document.getElementById("checkbox-contours").checked
       contoursLayer.setVisible(v1);
-      var v2 = document.getElementById("checkbox-terra").checked
       var v3 = document.getElementById("checkbox-hillshade").checked
       hillshadeLayer.setVisible(v3);
       done(complete);
@@ -339,7 +313,7 @@ document.getElementById("checkbox-contours").addEventListener('change', function
   }
 });
 
-document.getElementById("checkbox-terra").addEventListener('change', function() {
+document.getElementById("checkbox-sealevel").addEventListener('change', function() {
   sealevelLayer.setVisible(this.checked);
 });
 
@@ -399,11 +373,11 @@ control.addEventListener('change', listener);
 output.innerText = control.value;
 
 document.getElementById("checkbox-basemap").checked = true;
-document.getElementById("checkbox-contours").checked = true;
-document.getElementById("checkbox-terra").checked = true;
+document.getElementById("checkbox-contours").checked = false;
+document.getElementById("checkbox-sealevel").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
 basemapLayer.setVisible(true);
-contoursLayer.setVisible(true);
+contoursLayer.setVisible(false);
 sealevelLayer.setVisible(true);
 hillshadeLayer.setVisible(true);
 

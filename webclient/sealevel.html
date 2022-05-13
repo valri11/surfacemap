@@ -23,28 +23,32 @@
   <label for="checkbox-basemap">Show basemap</label>
   <input type="checkbox" id="checkbox-contours" name="checkbox-contours" checked>
   <label for="checkbox-contours">Show contours</label>
+  <input type="checkbox" id="checkbox-sealevel" name="checkbox-sealevel" checked>
+  <label for="checkbox-sealevel">Show sealevel</label>
   <input type="checkbox" id="checkbox-hillshade" name="checkbox-hillshade" checked>
   <label for="checkbox-hillshade">Show hillshade</label>
   </div>
   <div id="slider-id"><div class="ui-slider-handle"></div></div>
-  <button id="fly-to-kg">KG</button>
-  <button id="fly-to-khan-tengri">Khan Tengri</button>
-  <button id="fly-to-pik-pobedy">Pik Pobedy</button>
-  <button id="fly-to-everest">Mt Everest</button>
-  <button id="fly-to-katoomba">Katoomba</button>
-  <button id="fly-to-denali">Mt Denali</button>
-  <button id="fly-to-oahu">Oahu</button>
-  <button id="fly-to-grand-canyon">Grand Canyon</button>
-  <button id="fly-to-cordillera">Cordillera Blanca</button>
-  <button id="fly-to-kilimanjaro">Mt Kilimanjaro</button>
-  <button id="fly-to-olympus">Olympus</button>
-  <button id="fly-to-mariana">Challenger Deep</button>
+  <button id="fly-to-sydney">Sydney</button>
+  <button id="fly-to-newyork">New York</button>
+  <button id="fly-to-london">London</button>
+  <button id="fly-to-paris">Paris</button>
+  <button id="fly-to-venice">Venice</button>
+  <button id="fly-to-hawaii">Hawaii</button>
   <div id="popup" class="ol-popup">
     <a href="#" id="popup-closer" class="ol-popup-closer"></a>
     <div id="popup-content"></div>
   </div>
+  <div>
+  <br>
+  <label>
+      Sea level
+      <input id="level" type="range" min="0" max="200" value="1"/>
+      +<span id="output"></span> m
+    </label>
+  </div>
   <div id="mouse-position"></div>
-  <script type="module" src="./main.js"></script>
+  <script type="module" src="./sealevel.js"></script>
 </body>
 
 </html>

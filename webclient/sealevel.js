@@ -1,4 +1,4 @@
-import './main_style.css';
+import './sealevel.css';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import {Tile as TileLayer, VectorTile as VectorTileLayer, Image as ImageLayer} from 'ol/layer';
@@ -28,6 +28,22 @@ const sourceTerrain = new XYZ({
   }),
 });
 
+const sourceTerra = new XYZ({
+  url: 'http://' + config.contours.host + ':' + config.contours.port + '/terra/{z}/{x}/{y}.img',
+  crossOrigin: 'anonymous',
+  interpolate: false,
+  tileGrid: createXYZ({
+    minZoom: 6,
+    maxZoom: 15
+  }),
+});
+
+const raster = new Raster({
+  sources: [sourceTerra],
+  //operationType: 'image',
+  operation: flood,
+});
+
 const debugLayer = new TileLayer({
     source: new TileDebug({
         projection: 'EPSG:3857',
@@ -46,25 +62,24 @@ const basemapLayer = new TileLayer({
     source: new OSM()
 });
 
-// POI
-const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
-const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
-const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
-const mtDenali = fromLonLat([-151.00726915968875,63.069268194834244])
-const pikPobedy = fromLonLat([80.129257551509, 42.03767896555761])
-const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
-const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
-const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
-const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
-const grandCanyon = fromLonLat([-112.09523569822798,36.10031704536186])
+const sealevelLayer = new ImageLayer({
+    opacity: 0.6,
+    source: raster,
+});
+
+
+const newYork = fromLonLat([-74.04442672993127,40.69010807133021])
+const london = fromLonLat([-0.12467245895210548,51.50101981028784])
+const paris = fromLonLat([2.3360465678907536,48.85928539255598])
+const venice = fromLonLat([12.340694942695933,45.43544087127655])
+const operaHouse = fromLonLat([151.2153396126718,-33.85659727934901])
 const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
-const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 var ctrInterval = 100;
 
 const view = new View({
-  center: kyrg,
-  zoom: 14
+  center: operaHouse,
+  zoom: 15
 });
 
 const labelStyle = new Style({
@@ -127,7 +142,8 @@ const map = new Map({
     basemapLayer,
     debugLayer,
     contoursLayer,
-    hillshadeLayer
+    hillshadeLayer,
+    sealevelLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -137,52 +153,28 @@ function onClick(id, callback) {
   document.getElementById(id).addEventListener('click', callback);
 }
 
-onClick('fly-to-kg', function() {
-  flyTo(kyrg, function() {});
+onClick('fly-to-sydney', function() {
+  flyTo(operaHouse, function() {});
 });
 
-onClick('fly-to-everest', function() {
-  flyTo(mtEverest, function() {});
+onClick('fly-to-newyork', function() {
+  flyTo(newYork, function() {});
 });
 
-onClick('fly-to-kilimanjaro', function() {
-  flyTo(mtKilimanjaro, function() {});
+onClick('fly-to-london', function() {
+  flyTo(london, function() {});
 });
 
-onClick('fly-to-katoomba', function() {
-  flyTo(katoomba, function() {});
+onClick('fly-to-paris', function() {
+  flyTo(paris, function() {});
 });
 
-onClick('fly-to-denali', function() {
-  flyTo(mtDenali, function() {});
+onClick('fly-to-venice', function() {
+  flyTo(venice, function() {});
 });
 
-onClick('fly-to-cordillera', function() {
-  flyTo(cordilleraBlanca, function() {});
-});
-
-onClick('fly-to-grand-canyon', function() {
-  flyTo(grandCanyon, function() {});
-});
-
-onClick('fly-to-pik-pobedy', function() {
-  flyTo(pikPobedy, function() {});
-});
-
-onClick('fly-to-olympus', function() {
-  flyTo(mtOlympus, function() {});
-});
-
-onClick('fly-to-khan-tengri', function() {
-  flyTo(khanTengri, function() {});
-});
-
-onClick('fly-to-oahu', function() {
+onClick('fly-to-hawaii', function() {
   flyTo(oahuHawaii, function() {});
-});
-
-onClick('fly-to-mariana', function() {
-  flyTo(challengerDeep, function() {});
 });
 
 function flyTo(location, done) {
@@ -235,7 +227,6 @@ map.on('pointermove', function(evt) {
   if (feature_onHover) {
     var content = document.getElementById('popup-content');
     var properties = feature_onHover.getProperties()
-    console.log(properties.name);
     console.log(JSON.stringify(properties["elevation"]));
 
     var info = document.getElementById('mouse-position');
@@ -322,6 +313,10 @@ document.getElementById("checkbox-contours").addEventListener('change', function
   }
 });
 
+document.getElementById("checkbox-sealevel").addEventListener('change', function() {
+  sealevelLayer.setVisible(this.checked);
+});
+
 document.getElementById("checkbox-hillshade").addEventListener('change', function() {
   hillshadeLayer.setVisible(this.checked);
 });
@@ -337,147 +332,55 @@ document.getElementById("checkbox-debug").addEventListener('change', function() 
   }
 });
 
-function shade(inputs, data) {
-  const elevationImage = inputs[0];
-  const width = elevationImage.width;
-  const height = elevationImage.height;
-  const elevationData = elevationImage.data;
-  const shadeData = new Uint8ClampedArray(elevationData.length);
-  const dp = data.resolution * 2;
-  const maxX = width - 1;
-  const maxY = height - 1;
-  const pixel = [0, 0, 0, 0];
-  const twoPi = 2 * Math.PI;
-  const halfPi = Math.PI / 2;
-  const sunEl = (Math.PI * data.sunEl) / 180;
-  const sunAz = (Math.PI * data.sunAz) / 180;
-  const cosSunEl = Math.cos(sunEl);
-  const sinSunEl = Math.sin(sunEl);
-  let pixelX,
-    pixelY,
-    x0,
-    x1,
-    y0,
-    y1,
-    offset,
-    z0,
-    z1,
-    dzdx,
-    dzdy,
-    slope,
-    aspect,
-    cosIncidence,
-    scaled;
-  function calculateElevation(pixel) {
-    // The method used to extract elevations from the DEM.
-    // In this case the format used is
-    // red + green * 2 + blue * 3
-    //
-    // Other frequently used methods include the Mapbox format
-    // (red * 256 * 256 + green * 256 + blue) * 0.1 - 10000
-    // and the Terrarium format
-    // (red * 256 + green + blue / 256) - 32768
-    //
-    //return pixel[0] + pixel[1] * 2 + pixel[2] * 3;
-    return (pixel[0] * 256 + pixel[1] + pixel[2] / 256) - 32768;
-  }
-  for (pixelY = 0; pixelY <= maxY; ++pixelY) {
-    y0 = pixelY === 0 ? 0 : pixelY - 1;
-    y1 = pixelY === maxY ? maxY : pixelY + 1;
-    for (pixelX = 0; pixelX <= maxX; ++pixelX) {
-      x0 = pixelX === 0 ? 0 : pixelX - 1;
-      x1 = pixelX === maxX ? maxX : pixelX + 1;
 
-      // determine elevation for (x0, pixelY)
-      offset = (pixelY * width + x0) * 4;
-      pixel[0] = elevationData[offset];
-      pixel[1] = elevationData[offset + 1];
-      pixel[2] = elevationData[offset + 2];
-      pixel[3] = elevationData[offset + 3];
-      z0 = data.vert * calculateElevation(pixel);
-
-      // determine elevation for (x1, pixelY)
-      offset = (pixelY * width + x1) * 4;
-      pixel[0] = elevationData[offset];
-      pixel[1] = elevationData[offset + 1];
-      pixel[2] = elevationData[offset + 2];
-      pixel[3] = elevationData[offset + 3];
-      z1 = data.vert * calculateElevation(pixel);
-
-      dzdx = (z1 - z0) / dp;
-
-      // determine elevation for (pixelX, y0)
-      offset = (y0 * width + pixelX) * 4;
-      pixel[0] = elevationData[offset];
-      pixel[1] = elevationData[offset + 1];
-      pixel[2] = elevationData[offset + 2];
-      pixel[3] = elevationData[offset + 3];
-      z0 = data.vert * calculateElevation(pixel);
-
-      // determine elevation for (pixelX, y1)
-      offset = (y1 * width + pixelX) * 4;
-      pixel[0] = elevationData[offset];
-      pixel[1] = elevationData[offset + 1];
-      pixel[2] = elevationData[offset + 2];
-      pixel[3] = elevationData[offset + 3];
-      z1 = data.vert * calculateElevation(pixel);
-
-      dzdy = (z1 - z0) / dp;
-
-      slope = Math.atan(Math.sqrt(dzdx * dzdx + dzdy * dzdy));
-
-      aspect = Math.atan2(dzdy, -dzdx);
-      if (aspect < 0) {
-        aspect = halfPi - aspect;
-      } else if (aspect > halfPi) {
-        aspect = twoPi - aspect + halfPi;
-      } else {
-        aspect = halfPi - aspect;
-      }
-
-      cosIncidence =
-        sinSunEl * Math.cos(slope) +
-        cosSunEl * Math.sin(slope) * Math.cos(sunAz - aspect);
-
-      offset = (pixelY * width + pixelX) * 4;
-      scaled = 255 * cosIncidence;
-      shadeData[offset] = scaled;
-      shadeData[offset + 1] = scaled;
-      shadeData[offset + 2] = scaled;
-      shadeData[offset + 3] = elevationData[offset + 3];
+function flood(pixels, data) {
+  const pixel = pixels[0];
+    function calculateElevation(pixel) {
+        // The method used to extract elevations from the DEM.
+        // In this case the format used is
+        // red + green * 2 + blue * 3
+        //
+        // Other frequently used methods include the Mapbox format
+        // (red * 256 * 256 + green * 256 + blue) * 0.1 - 10000
+        // and the Terrarium format
+        // (red * 256 + green + blue / 256) - 32768
+        //
+        //return pixel[0] + pixel[1] * 2 + pixel[2] * 3;
+        return (pixel[0] * 256 + pixel[1] + pixel[2] / 256) - 32768;
+    }
+  if (pixel[3]) {
+    const height = calculateElevation(pixel);
+    if (height <= data.level) {
+      pixel[0] = 134;
+      pixel[1] = 203;
+      pixel[2] = 249;
+      pixel[3] = 255;
+    } else {
+      pixel[3] = 0;
     }
   }
-
-  return {data: shadeData, width: width, height: height};
+  return pixel;
 }
 
-const controlIds = ['vert', 'sunEl', 'sunAz'];
-const controls = {};
-controlIds.forEach(function (id) {
-  const control = document.getElementById(id);
-  const output = document.getElementById(id + 'Out');
-  const listener = function () {
-    output.innerText = control.value;
-    raster.changed();
-  };
-  control.addEventListener('input', listener);
-  control.addEventListener('change', listener);
+const control = document.getElementById('level');
+const output = document.getElementById('output');
+const listener = function () {
   output.innerText = control.value;
-  controls[id] = control;
-});
-
-raster.on('beforeoperations', function (event) {
-  // the event.data object will be passed to operations
-  const data = event.data;
-  data.resolution = event.resolution;
-  for (const id in controls) {
-    data[id] = Number(controls[id].value);
-  }
-});
+  raster.changed();
+};
+control.addEventListener('input', listener);
+control.addEventListener('change', listener);
+output.innerText = control.value;
 
 document.getElementById("checkbox-basemap").checked = true;
-document.getElementById("checkbox-contours").checked = true;
+document.getElementById("checkbox-contours").checked = false;
+document.getElementById("checkbox-sealevel").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
 basemapLayer.setVisible(true);
-contoursLayer.setVisible(true);
+contoursLayer.setVisible(false);
+sealevelLayer.setVisible(true);
 hillshadeLayer.setVisible(true);
+
+raster.on('beforeoperations', function (event) {
+  event.data.level = control.value;
+});

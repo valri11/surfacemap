@@ -14,7 +14,7 @@ import {Attribution, MousePosition, defaults as defaultControls} from 'ol/contro
 
 // hillshade images
 const sourceTerrain = new XYZ({
-  url: `http://${env.contours.host}:${env.contours.port}/terrain/{z}/{x}/{y}.img`,
+  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/terrain/{z}/{x}/{y}.img`,
   crossOrigin: 'anonymous',
   tileGrid: createXYZ({
     minZoom: 6,
@@ -23,7 +23,7 @@ const sourceTerrain = new XYZ({
 });
 
 const sourceTerra = new XYZ({
-  url: `http://${env.contours.host}:${env.contours.port}/terra/{z}/{x}/{y}.img`,
+  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/terra/{z}/{x}/{y}.img`,
   crossOrigin: 'anonymous',
   tileGrid: createXYZ({
     minZoom: 6,
@@ -108,13 +108,11 @@ const lineStyle = new Style({
 const style = [lineStyle, labelStyle];
 
 function getContoursUrl(interval) {
-    return `http://${env.contours.host}:${env.contours.port}/contours/{z}/{x}/{y}.mvt?interval=${interval}`;
+    return `${env.contours.proto}://${env.contours.host}:${env.contours.port}/contours/{z}/{x}/{y}.mvt?interval=${interval}`;
 }
 
 const contoursLayer = new VectorTileLayer({
   source: new VectorTile({
-    //url: 'http://localhost:8000/contours/{z}/{x}/{y}.geojson',
-    //format: new GeoJSON()
     url: getContoursUrl(ctrInterval),
     format: new MVT(),
     tileGrid: createXYZ({

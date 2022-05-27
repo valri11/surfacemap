@@ -138,6 +138,7 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	r.HandleFunc("/terra/{z}/{x}/{y}.img", t.tilesHandler)
 	r.HandleFunc("/terrain/{z}/{x}/{y}.img", t.tilesTerrainHandler)
 	r.HandleFunc("/contours/{z}/{x}/{y}.{format}", t.tilesContoursHandler)
+	r.HandleFunc("/color-relief/{z}/{x}/{y}.img", t.colorReliefHandler)
 
 	// Where ORIGIN_ALLOWED is like `scheme://dns[:port]`, or `*` (insecure)
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "content-type", "username", "password", "Referer"})
@@ -179,6 +180,66 @@ func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "image/png")
+
+	out := buf.Bytes()
+
+	w.Write(out)
+}
+
+func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+
+	log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+
+	z, err := strconv.Atoi(vars["z"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	x, err := strconv.Atoi(vars["x"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	y, err := strconv.Atoi(vars["y"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	buf, err := h.getTile(ctx, z, x, y)
+	if err != nil {
+		log.Printf("req: ERR: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+
+	dt1 := time.Now()
+
+	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	imgOut, err := ColorReliefImage(img)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	dt2 := time.Now()
+	log.Printf("ColorRelief completed in %v", dt2.Sub(dt1))
+
+	buf = new(bytes.Buffer)
+	err = png.Encode(buf, imgOut)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	out := buf.Bytes()
 

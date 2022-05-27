@@ -4,6 +4,7 @@ import Map from 'ol/Map';
 import View from 'ol/View';
 import {Tile as TileLayer, VectorTile as VectorTileLayer, Image as ImageLayer} from 'ol/layer';
 import {TileDebug, OSM, XYZ, VectorTile, Raster} from 'ol/source';
+import TileImage from 'ol/source/TileImage';
 import {GeoJSON, MVT} from 'ol/format';
 import {createStringXY} from 'ol/coordinate';
 import {fromLonLat, getPointResolution} from 'ol/proj';
@@ -20,6 +21,19 @@ const sourceTerrain = new XYZ({
     minZoom: 6,
     maxZoom: 15
   }),
+});
+
+const sourceColorRelief = new XYZ({
+  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/color-relief/{z}/{x}/{y}.img`,
+  crossOrigin: 'anonymous',
+  tileGrid: createXYZ({
+    minZoom: 6,
+    maxZoom: 15
+  }),
+});
+
+const sourceTiles = new TileImage({
+    url: `${env.url.tile}/tiles/v3/Vert/{z}/{x}/{y}.img?apikey=${env.apiKey}&tertiary=satellite`,
 });
 
 const debugLayer = new TileLayer({
@@ -40,6 +54,15 @@ const basemapLayer = new TileLayer({
     source: new OSM()
 });
 
+const nearmapLayer = new TileLayer({
+    source: sourceTiles,
+});
+
+const colormapLayer = new TileLayer({
+  source: sourceColorRelief,
+  opacity: 0.5,
+});
+
 // POI
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
 const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
@@ -52,12 +75,13 @@ const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
 const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
 const grandCanyon = fromLonLat([-112.09523569822798,36.10031704536186])
 const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
+const mtFuji = fromLonLat([138.73121113691982,35.363529199406074])
 const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 var ctrInterval = 100;
 
 const view = new View({
-  center: kyrg,
+  center: katoomba,
   zoom: 14
 });
 
@@ -117,9 +141,11 @@ const map = new Map({
   target: 'map',
   layers: [
     basemapLayer,
-    debugLayer,
+    nearmapLayer,
     contoursLayer,
-    hillshadeLayer
+    colormapLayer,
+    hillshadeLayer,
+    debugLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -171,6 +197,10 @@ onClick('fly-to-khan-tengri', function() {
 
 onClick('fly-to-oahu', function() {
   flyTo(oahuHawaii, function() {});
+});
+
+onClick('fly-to-fuji', function() {
+  flyTo(mtFuji, function() {});
 });
 
 onClick('fly-to-mariana', function() {
@@ -306,32 +336,36 @@ document.getElementById("checkbox-basemap").addEventListener('change', function(
   basemapLayer.setVisible(this.checked);
 });
 
+document.getElementById("checkbox-nearmap").addEventListener('change', function() {
+  nearmapLayer.setVisible(this.checked);
+});
+
 document.getElementById("checkbox-contours").addEventListener('change', function() {
-  if (this.checked) {
-    contoursLayer.setVisible(true);
-  } else {
-    contoursLayer.setVisible(false);
-  }
+  contoursLayer.setVisible(this.checked);
+});
+
+document.getElementById("checkbox-colormap").addEventListener('change', function() {
+  colormapLayer.setVisible(this.checked);
 });
 
 document.getElementById("checkbox-hillshade").addEventListener('change', function() {
   hillshadeLayer.setVisible(this.checked);
 });
 
+document.getElementById("checkbox-debug").addEventListener('change', function() {
+  debugLayer.setVisible(this.checked);
+});
+
 var showDebug = document.getElementById("checkbox-debug").checked
 debugLayer.setVisible(showDebug);
 
-document.getElementById("checkbox-debug").addEventListener('change', function() {
-  if (this.checked) {
-    debugLayer.setVisible(true);
-  } else {
-    debugLayer.setVisible(false);
-  }
-});
-
 document.getElementById("checkbox-basemap").checked = true;
-document.getElementById("checkbox-contours").checked = true;
-document.getElementById("checkbox-hillshade").checked = true;
+document.getElementById("checkbox-nearmap").checked = false;
+document.getElementById("checkbox-contours").checked = false;
+document.getElementById("checkbox-colormap").checked = true;
+document.getElementById("checkbox-hillshade").checked = false;
 basemapLayer.setVisible(true);
-contoursLayer.setVisible(true);
-hillshadeLayer.setVisible(true);
+nearmapLayer.setVisible(false);
+contoursLayer.setVisible(false);
+colormapLayer.setVisible(true);
+hillshadeLayer.setVisible(false);

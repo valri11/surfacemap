@@ -4,6 +4,8 @@ import Map from 'ol/Map';
 import View from 'ol/View';
 import {Tile as TileLayer, VectorTile as VectorTileLayer, Image as ImageLayer} from 'ol/layer';
 import {TileDebug, OSM, XYZ, VectorTile, Raster} from 'ol/source';
+import VectorTileSource from 'ol/source/VectorTile';
+import TileImage from 'ol/source/TileImage';
 import {GeoJSON, MVT} from 'ol/format';
 import {createStringXY} from 'ol/coordinate';
 import {fromLonLat, getPointResolution} from 'ol/proj';
@@ -11,6 +13,32 @@ import Overlay from 'ol/Overlay';
 import {Fill, Stroke, Style, Text} from 'ol/style';
 import {createXYZ} from 'ol/tilegrid';
 import {Attribution, MousePosition, defaults as defaultControls} from 'ol/control';
+
+const labelStyle = new Style({
+  text: new Text({
+    font: '8px Calibri,sans-serif',
+    overflow: true,
+    fill: new Fill({
+      color: '#000',
+    }),
+    stroke: new Stroke({
+      color: '#fff',
+      width: 3,
+    }),
+  }),
+});
+
+const lineStyle = new Style({
+//  fill: new Fill({
+//    color: 'rgba(255, 255, 255, 0.6)',
+//  }),
+  stroke: new Stroke({
+    color: '#319FD3',
+    width: 1,
+  }),
+});
+
+const style = [lineStyle, labelStyle];
 
 // hillshade images
 const sourceTerrain = new XYZ({
@@ -30,6 +58,15 @@ const sourceTerra = new XYZ({
     minZoom: 6,
     maxZoom: 15
   }),
+});
+
+const sourceTiles = new TileImage({
+    url: `${env.url.tile}/tiles/v3/Vert/{z}/{x}/{y}.img?apikey=${env.apiKey}&tertiary=satellite&surveyid=4d9b7bf8-0a5f-11ec-86c6-0fbb04ba1b1e`,
+});
+
+const sourceProperties = new VectorTileSource({
+    url: `${env.url.feature}/features/v1/au-properties-2018/{z}/{x}/{y}.mvt?apikey=${env.apiKey}`,
+    format: new MVT(),
 });
 
 const raster = new Raster({
@@ -56,6 +93,15 @@ const basemapLayer = new TileLayer({
     source: new OSM()
 });
 
+const tilesLayer = new TileLayer({
+    source: sourceTiles,
+});
+
+const propertiesLayer = new VectorTileLayer({
+    source: sourceProperties,
+    style: style,
+});
+
 const sealevelLayer = new ImageLayer({
     opacity: 0.6,
     source: raster,
@@ -69,6 +115,9 @@ const venice = fromLonLat([12.340694942695933,45.43544087127655])
 const operaHouse = fromLonLat([151.2153396126718,-33.85659727934901])
 const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
 
+const lismore = fromLonLat([153.27707525263946,-28.80607911799792])
+const windsor = fromLonLat([150.822676436187,-33.60364397111745])
+
 var ctrInterval = 100;
 
 const view = new View({
@@ -76,31 +125,6 @@ const view = new View({
   zoom: 15
 });
 
-const labelStyle = new Style({
-  text: new Text({
-    font: '8px Calibri,sans-serif',
-    overflow: true,
-    fill: new Fill({
-      color: '#000',
-    }),
-    stroke: new Stroke({
-      color: '#fff',
-      width: 3,
-    }),
-  }),
-});
-
-const lineStyle = new Style({
-  fill: new Fill({
-    color: 'rgba(255, 255, 255, 0.6)',
-  }),
-  stroke: new Stroke({
-    color: '#319FD3',
-    width: 1,
-  }),
-});
-
-const style = [lineStyle, labelStyle];
 
 function getContoursUrl(interval) {
     return `${env.contours.proto}://${env.contours.host}:${env.contours.port}/contours/{z}/{x}/{y}.mvt?interval=${interval}`;
@@ -132,10 +156,12 @@ const map = new Map({
   target: 'map',
   layers: [
     basemapLayer,
-    debugLayer,
+    tilesLayer,
     contoursLayer,
     hillshadeLayer,
+    propertiesLayer,
     sealevelLayer,
+    debugLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -167,6 +193,14 @@ onClick('fly-to-venice', function() {
 
 onClick('fly-to-hawaii', function() {
   flyTo(oahuHawaii, function() {});
+});
+
+onClick('fly-to-windsor', function() {
+  flyTo(windsor, function() {});
+});
+
+onClick('fly-to-lismore', function() {
+  flyTo(lismore, function() {});
 });
 
 function flyTo(location, done) {
@@ -297,6 +331,10 @@ document.getElementById("checkbox-basemap").addEventListener('change', function(
   basemapLayer.setVisible(this.checked);
 });
 
+document.getElementById("checkbox-nearmap").addEventListener('change', function() {
+  tilesLayer.setVisible(this.checked);
+});
+
 document.getElementById("checkbox-contours").addEventListener('change', function() {
   if (this.checked) {
     contoursLayer.setVisible(true);
@@ -311,6 +349,10 @@ document.getElementById("checkbox-sealevel").addEventListener('change', function
 
 document.getElementById("checkbox-hillshade").addEventListener('change', function() {
   hillshadeLayer.setVisible(this.checked);
+});
+
+document.getElementById("checkbox-properties").addEventListener('change', function() {
+  propertiesLayer.setVisible(this.checked);
 });
 
 var showDebug = document.getElementById("checkbox-debug").checked
@@ -365,13 +407,16 @@ control.addEventListener('change', listener);
 output.innerText = control.value;
 
 document.getElementById("checkbox-basemap").checked = true;
+document.getElementById("checkbox-nearmap").checked = true;
 document.getElementById("checkbox-contours").checked = false;
 document.getElementById("checkbox-sealevel").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
+document.getElementById("checkbox-properties").checked = false;
 basemapLayer.setVisible(true);
 contoursLayer.setVisible(false);
 sealevelLayer.setVisible(true);
 hillshadeLayer.setVisible(true);
+propertiesLayer.setVisible(false);
 
 raster.on('beforeoperations', function (event) {
   event.data.level = control.value;

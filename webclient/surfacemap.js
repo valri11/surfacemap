@@ -1,4 +1,4 @@
-import './style.css';
+import './sealevel.css';
 import * as env from './env.json';
 import Map from 'ol/Map';
 import View from 'ol/View';

@@ -6,6 +6,8 @@ import (
 	"image/draw"
 	"math"
 	"sync"
+
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 func HillshadeImage(img image.Image,
@@ -165,6 +167,193 @@ func HillshadeImage(img image.Image,
 		col := imgOut.At(x-1, y)
 		imgOut.Set(x, y, col)
 	}
+
+	return imgOut, nil
+}
+
+type GradientTable []struct {
+	Col colorful.Color
+	Pos float64
+}
+
+func (gt GradientTable) GetInterpolatedColorFor(t float64) colorful.Color {
+	for i := 0; i < len(gt)-1; i++ {
+		c1 := gt[i]
+		c2 := gt[i+1]
+		if c1.Pos <= t && t <= c2.Pos {
+			// We are in between c1 and c2. Go blend them!
+			t := (t - c1.Pos) / (c2.Pos - c1.Pos)
+			return c1.Col.BlendHcl(c2.Col, t).Clamped()
+		}
+	}
+
+	// Nothing found? Means we're at (or past) the last gradient keypoint.
+	return gt[len(gt)-1].Col
+}
+
+func (gt GradientTable) HeightToColor(h float64) colorful.Color {
+
+	if h <= gt[0].Pos {
+		return gt[0].Col
+	}
+
+	for i := 0; i < len(gt)-1; i++ {
+		c1 := gt[i]
+		c2 := gt[i+1]
+		if c1.Pos <= h && h <= c2.Pos {
+			// We are in between c1 and c2. Go blend them!
+			h := (h - c1.Pos) / (c2.Pos - c1.Pos)
+			return c1.Col.BlendHcl(c2.Col, h).Clamped()
+		}
+	}
+
+	return gt[len(gt)-1].Col
+}
+
+func MustParseHex(s string) colorful.Color {
+	c, err := colorful.Hex(s)
+	if err != nil {
+		panic("MustParseHex: " + err.Error())
+	}
+	return c
+}
+
+func ColorReliefImage(img image.Image) (image.Image, error) {
+
+	// < 0  40 120 160 #2878a0
+
+	// 0    110 220 110 #6edc6e
+	// 900  240 250 160 #f0faa0
+	// 1300 230 220 170 #e6dcaa
+	// 1900 220 220 220 #dcdcdc
+	// 2500 250 250 250 #fafafa
+
+//	keypoints := GradientTable{
+//		{MustParseHex("#2878a0"), 0.00},
+//		{MustParseHex("#6edc6e"), 0.01},
+//		{MustParseHex("#f0faa0"), 900.0},
+//		{MustParseHex("#e6dcaa"), 1300.0},
+//		{MustParseHex("#dcdcdc"), 1900.0},
+//		{MustParseHex("#fafafa"), 2500.0},
+//	}
+
+//	   0 102 153 153 #0669999
+//	   1  46 154  88 #2e9a58
+//	 600 251 255 128 #fbff80
+//	1200 224 108  31 #e06c1f
+//	2500 200  55  55 #c83737
+//	4000 215 244 244 #d7f4f4
+
+	keypoints := GradientTable{
+		{MustParseHex("#0669999"), 0.00},
+		{MustParseHex("#2e9a58"), 0.01},
+		{MustParseHex("#fbff80"), 900.0},
+		{MustParseHex("#e06c1f"), 1300.0},
+		{MustParseHex("#c83737"), 1900.0},
+		{MustParseHex("#d7f4f4"), 2500.0},
+	}
+
+//	keypoints := GradientTable{
+//		{MustParseHex("#9e0142"), 0.0},
+//		{MustParseHex("#d53e4f"), 0.1},
+//		{MustParseHex("#f46d43"), 0.2},
+//		{MustParseHex("#fdae61"), 0.3},
+//		{MustParseHex("#fee090"), 0.4},
+//		{MustParseHex("#ffffbf"), 0.5},
+//		{MustParseHex("#e6f598"), 0.6},
+//		{MustParseHex("#abdda4"), 0.7},
+//		{MustParseHex("#66c2a5"), 0.8},
+//		{MustParseHex("#3288bd"), 0.9},
+//		{MustParseHex("#5e4fa2"), 1.0},
+//	}
+
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	getHeightAtPixel := func(rgba *image.RGBA, x int, y int) float64 {
+		pix_idx := (y*width + x) * 4
+		pix := rgba.Pix[pix_idx : pix_idx+4]
+		dr := uint32(pix[0])
+		dg := uint32(pix[1])
+		db := uint32(pix[2])
+		da := uint32(pix[3])
+
+		h := rgbaToHeight(dr, dg, db, da)
+		return h
+	}
+
+	rgba := image.NewRGBA(bounds)
+	draw.Draw(rgba, bounds, img, bounds.Min, draw.Src)
+
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{width, height}
+
+	//imgOut := image.NewGray(image.Rectangle{upLeft, lowRight})
+	imgOut := image.NewNRGBA(image.Rectangle{upLeft, lowRight})
+
+	var wg sync.WaitGroup
+	sem := make(chan bool, MaxConcurrency)
+
+	//hMin := 0.0
+	//hMax := 8000.0
+
+	//hMin := 10000.0
+	//hMax := -20000.0
+
+//	for y := 0; y < height; y++ {
+//		wg.Add(1)
+//		sem <- true
+//
+//		y := y
+//		go func() {
+//			defer func() {
+//				<-sem
+//				wg.Done()
+//			}()
+//
+//			for x := 0; x < width; x++ {
+//
+//				h := getHeightAtPixel(rgba, x, y)
+//
+//				if h > hMax {
+//					hMax = h
+//				}
+//
+//				if h < hMin {
+//					hMin = h
+//				}
+//			}
+//		}()
+//	}
+//	wg.Wait()
+
+
+	for y := 0; y < height; y++ {
+		wg.Add(1)
+		sem <- true
+
+		y := y
+		go func() {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+
+			for x := 0; x < width; x++ {
+
+				h := getHeightAtPixel(rgba, x, y)
+
+				col := keypoints.HeightToColor(h)
+
+				//hCol := (h - hMin) / (hMax - hMin)
+				//col := keypoints.GetInterpolatedColorFor(hCol)
+
+				//col := color.Gray{uint8(hCol)}
+				imgOut.Set(x, y, col)
+			}
+		}()
+	}
+	wg.Wait()
 
 	return imgOut, nil
 }

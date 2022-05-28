@@ -16,6 +16,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -32,13 +33,7 @@ import (
 	"github.com/valri11/surfacemap/slippymath"
 
 	"github.com/fogleman/contourmap"
-)
-
-const (
-	N          = 12
-	Scale      = 1
-	Background = "77C4D3"
-	Palette    = "70a80075ab007bb00080b30087b8008ebd0093bf009ac400a1c900a7cc00aed100b6d600bcd900c4de00cce300d2e600dbeb00e1ed00eaf200f3f700fafa00ffff05ffff12ffff1cffff29ffff36ffff42ffff4fffff5cffff66ffff73ffff80ffff8cffff99ffffa3ffffb0ffffbdffffc9ffffd6ffffe3ffffedfffffafcfcfcf7f7f7f5f5f5f0f0f0edededebebebe6e6e6e3e3e3dedededbdbdbd6d6d6d4d4d4cfcfcfccccccc7c7c7c4c4c4c2c2c2bdbdbdbababab5b5b5b3b3b3b3b3b3"
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 // webserverCmd represents the webserver command
@@ -51,6 +46,10 @@ var webserverCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(webserverCmd)
+
+	webserverCmd.Flags().BoolP("dev-mode", "", false, "development mode (http on loclahost)")
+	webserverCmd.Flags().String("tls-cert", "", "TLS certificate file")
+	webserverCmd.Flags().String("tls-cert-key", "", "TLS certificate key file")
 }
 
 const (
@@ -59,7 +58,7 @@ const (
 )
 
 const (
-	CacheSize = 512
+	CacheSize = 4 * 512
 	TileSize  = 256
 
 	epsilon = 0.00001
@@ -86,6 +85,7 @@ type terra struct {
 	s3TileStore        *S3TileStore
 	cacheTileStore     *CacheTileStore
 	elevationTileStore *ElevationTileStore
+	gradientMap        *gradientMap
 }
 
 func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
@@ -109,6 +109,35 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 		return nil, err
 	}
 
+	// < 0  40 120 160 #2878a0
+
+	// 0    110 220 110 #6edc6e
+	// 900  240 250 160 #f0faa0
+	// 1300 230 220 170 #e6dcaa
+	// 1900 220 220 220 #dcdcdc
+	// 2500 250 250 250 #fafafa
+
+	//	   0 102 153 153 #0669999
+	//	   1  46 154  88 #2e9a58
+	//	 600 251 255 128 #fbff80
+	//	1200 224 108  31 #e06c1f
+	//	2500 200  55  55 #c83737
+	//	4000 215 244 244 #d7f4f4
+
+	colorCard := []colorCard{
+		{0.00, "#066999"},
+		{0.01, "#2e9a58"},
+		{900.0, "#fbff80"},
+		{1300.0, "#e06c1f"},
+		{1900.0, "#c83737"},
+		{2500.0, "#d7f4f4"},
+	}
+
+	gm, err := NewGradientMap(colorCard, 0.1)
+	if err != nil {
+		return nil, err
+	}
+
 	t := terra{
 		cfg:                cfg,
 		s3Config:           s3Config,
@@ -116,12 +145,34 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 		s3TileStore:        s3TileStore,
 		cacheTileStore:     cacheTileStore,
 		elevationTileStore: elevationTileStore,
+		gradientMap:        gm,
 	}
 	return &t, nil
 }
 
 func mainCmd(cmd *cobra.Command, args []string) {
-	fmt.Println("webserver called")
+
+	devMode, err := cmd.Flags().GetBool("dev-mode")
+	if err != nil {
+		panic(err)
+	}
+
+	tlsCertFile, err := cmd.Flags().GetString("tls-cert")
+	if err != nil {
+		panic(err)
+	}
+
+	tlsCertKeyFile, err := cmd.Flags().GetString("tls-cert-key")
+	if err != nil {
+		panic(err)
+	}
+
+	if !devMode {
+		if tlsCertFile == "" || tlsCertKeyFile == "" {
+			fmt.Println("must provide TLS key and certificate")
+			return
+		}
+	}
 
 	ctx := context.Background()
 	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(awsRegion))
@@ -138,6 +189,7 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	r.HandleFunc("/terra/{z}/{x}/{y}.img", t.tilesHandler)
 	r.HandleFunc("/terrain/{z}/{x}/{y}.img", t.tilesTerrainHandler)
 	r.HandleFunc("/contours/{z}/{x}/{y}.{format}", t.tilesContoursHandler)
+	r.HandleFunc("/color-relief/{z}/{x}/{y}.img", t.colorReliefHandler)
 
 	// Where ORIGIN_ALLOWED is like `scheme://dns[:port]`, or `*` (insecure)
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "content-type", "username", "password", "Referer"})
@@ -145,7 +197,23 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
 
 	// start server listen with error handling
-	log.Fatal(http.ListenAndServe("0.0.0.0:8000", handlers.CORS(originsOk, headersOk, methodsOk)(r)))
+	mux := handlers.CORS(originsOk, headersOk, methodsOk)(r)
+	srv := &http.Server{
+		Addr:         "0.0.0.0:8000",
+		Handler:      mux,
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+
+	if devMode {
+		err = srv.ListenAndServe()
+	} else {
+		err = srv.ListenAndServeTLS(tlsCertFile, tlsCertKeyFile)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
@@ -185,7 +253,7 @@ func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
-func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
+func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
@@ -215,7 +283,70 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dt1 := time.Now()
+
+	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	imgOut, err := ColorReliefImage(img, h.gradientMap)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	dt2 := time.Now()
+	log.Printf("ColorRelief completed in %v", dt2.Sub(dt1))
+
+	buf = new(bytes.Buffer)
+	err = png.Encode(buf, imgOut)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	out := buf.Bytes()
+
 	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "max-age:28800, public")
+	cacheSince := time.Now().Format(http.TimeFormat)
+	cacheUntil := time.Now().Add(8 * time.Hour).Format(http.TimeFormat)
+	w.Header().Set("Last-Modified", cacheSince)
+	w.Header().Set("Expires", cacheUntil)
+
+	w.Write(out)
+}
+
+func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+
+	log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+
+	z, err := strconv.Atoi(vars["z"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	x, err := strconv.Atoi(vars["x"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	y, err := strconv.Atoi(vars["y"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	buf, err := h.getTile(ctx, z, x, y)
+	if err != nil {
+		log.Printf("req: ERR: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	dt1 := time.Now()
 	pixel_res, err := slippymath.TilePixelResolution(uint32(z), float64(x), float64(y))
@@ -249,6 +380,13 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := buf.Bytes()
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "max-age:28800, public")
+	cacheSince := time.Now().Format(http.TimeFormat)
+	cacheUntil := time.Now().Add(8 * time.Hour).Format(http.TimeFormat)
+	w.Header().Set("Last-Modified", cacheSince)
+	w.Header().Set("Expires", cacheUntil)
 
 	w.Write(out)
 }
@@ -450,7 +588,6 @@ func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (
 		dt2 := time.Now()
 		log.Printf("S3 GetObject: %s, read: %d in %v", oName, len(cacheData), dt2.Sub(dt1))
 	} else {
-
 		return nil, err
 	}
 	return tile, nil
@@ -563,4 +700,102 @@ func rgbaToHeight(r uint32, g uint32, b uint32, a uint32) float64 {
 	h += float64(b) / 256
 	h -= 32768
 	return h
+}
+
+type HeightColor struct {
+	Col    colorful.Color
+	Height float64
+}
+
+type GradientTable []HeightColor
+
+type gradientMap struct {
+	heighColors    map[float64]colorful.Color
+	heighPrecision float64
+	minColor       HeightColor
+	maxColor       HeightColor
+	gradients      GradientTable
+
+	lock sync.RWMutex
+}
+
+type colorCard struct {
+	height   float64
+	colorHex string
+}
+
+func NewGradientMap(colorCard []colorCard, heighPrecision float64) (*gradientMap, error) {
+	if colorCard == nil || len(colorCard) == 0 {
+		return nil, errors.New("empty color cards")
+	}
+
+	gm := gradientMap{
+		heighColors:    make(map[float64]colorful.Color),
+		heighPrecision: heighPrecision,
+		gradients:      make(GradientTable, 0),
+	}
+
+	gm.minColor = HeightColor{
+		Height: colorCard[0].height,
+		Col:    MustParseHex(colorCard[0].colorHex),
+	}
+	gm.maxColor = HeightColor{
+		Height: colorCard[len(colorCard)-1].height,
+		Col:    MustParseHex(colorCard[len(colorCard)-1].colorHex),
+	}
+
+	for idx := 1; idx < len(colorCard); idx++ {
+		gm.gradients = append(gm.gradients,
+			HeightColor{
+				MustParseHex(colorCard[idx].colorHex),
+				colorCard[idx].height,
+			})
+	}
+
+	return &gm, nil
+}
+
+func (gm *gradientMap) HeightToColor(h float64) colorful.Color {
+
+	if h <= gm.minColor.Height {
+		return gm.minColor.Col
+	}
+	if h >= gm.maxColor.Height {
+		return gm.maxColor.Col
+	}
+
+	hPos := math.Round(h/gm.heighPrecision) * gm.heighPrecision
+
+	gm.lock.RLock()
+	hCol, ok := gm.heighColors[hPos]
+	gm.lock.RUnlock()
+	if ok {
+		return hCol
+	}
+
+	for i := 0; i < len(gm.gradients)-1; i++ {
+		c1 := gm.gradients[i]
+		c2 := gm.gradients[i+1]
+		if c1.Height <= h && h <= c2.Height {
+			// We are in between c1 and c2. Go blend them!
+			hBlend := (h - c1.Height) / (c2.Height - c1.Height)
+			hCol := c1.Col.BlendHcl(c2.Col, hBlend).Clamped()
+
+			gm.lock.Lock()
+			gm.heighColors[hPos] = hCol
+			gm.lock.Unlock()
+
+			return hCol
+		}
+	}
+
+	return gm.maxColor.Col
+}
+
+func MustParseHex(s string) colorful.Color {
+	c, err := colorful.Hex(s)
+	if err != nil {
+		panic("MustParseHex: " + err.Error())
+	}
+	return c
 }

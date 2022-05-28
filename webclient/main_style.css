@@ -6,11 +6,11 @@ html, body {
 }
 #map {
   width: 100%;
-  height: 530px;
+  height: 550px;
 }
 
 #slider-id {
-    width: 460px;
+    width: 400px;
     margin: 10px;
 }
 

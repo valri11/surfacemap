@@ -22,6 +22,15 @@ const sourceTerrain = new XYZ({
   }),
 });
 
+const sourceColorRelief = new XYZ({
+  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/color-relief/{z}/{x}/{y}.img`,
+  crossOrigin: 'anonymous',
+  tileGrid: createXYZ({
+    minZoom: 6,
+    maxZoom: 15
+  }),
+});
+
 const debugLayer = new TileLayer({
     source: new TileDebug({
         projection: 'EPSG:3857',
@@ -40,6 +49,11 @@ const basemapLayer = new TileLayer({
     source: new OSM()
 });
 
+const colormapLayer = new TileLayer({
+  source: sourceColorRelief,
+  opacity: 0.5,
+});
+
 // POI
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
 const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
@@ -52,12 +66,13 @@ const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
 const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
 const grandCanyon = fromLonLat([-112.09523569822798,36.10031704536186])
 const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
+const mtFuji = fromLonLat([138.73121113691982,35.363529199406074])
 const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 var ctrInterval = 100;
 
 const view = new View({
-  center: kyrg,
+  center: katoomba,
   zoom: 14
 });
 
@@ -117,9 +132,10 @@ const map = new Map({
   target: 'map',
   layers: [
     basemapLayer,
-    debugLayer,
     contoursLayer,
-    hillshadeLayer
+    colormapLayer,
+    hillshadeLayer,
+    debugLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -173,47 +189,52 @@ onClick('fly-to-oahu', function() {
   flyTo(oahuHawaii, function() {});
 });
 
+onClick('fly-to-fuji', function() {
+  flyTo(mtFuji, function() {});
+});
+
 onClick('fly-to-mariana', function() {
   flyTo(challengerDeep, function() {});
 });
 
 function flyTo(location, done) {
-  const duration = 2000;
-  const zoom = view.getZoom();
-  let parts = 2;
-  let called = false;
-
-  function callback(complete) {
-    contoursLayer.setVisible(false);
-    hillshadeLayer.setVisible(false);
-    --parts;
-    if (called) {
-      return;
-    }
-    if (parts === 0 || !complete) {
-      called = true;
-      var v1 = document.getElementById("checkbox-contours").checked
-      contoursLayer.setVisible(v1);
-      var v3 = document.getElementById("checkbox-hillshade").checked
-      hillshadeLayer.setVisible(v3);
-      done(complete);
-    }
-  }
-  view.animate({
-      center: location,
-      duration: duration,
-    },
-    callback
-  );
-  view.animate({
-      zoom: zoom - 1,
-      duration: duration / 2,
-    }, {
-      zoom: zoom,
-      duration: duration / 2,
-    },
-    callback
-  );
+    view.setCenter(location);
+//  const duration = 2000;
+//  const zoom = view.getZoom();
+//  let parts = 2;
+//  let called = false;
+//
+//  function callback(complete) {
+//    contoursLayer.setVisible(false);
+//    hillshadeLayer.setVisible(false);
+//    --parts;
+//    if (called) {
+//      return;
+//    }
+//    if (parts === 0 || !complete) {
+//      called = true;
+//      var v1 = document.getElementById("checkbox-contours").checked
+//      contoursLayer.setVisible(v1);
+//      var v3 = document.getElementById("checkbox-hillshade").checked
+//      hillshadeLayer.setVisible(v3);
+//      done(complete);
+//    }
+//  }
+//  view.animate({
+//      center: location,
+//      duration: duration,
+//    },
+//    callback
+//  );
+//  view.animate({
+//      zoom: zoom - 1,
+//      duration: duration / 2,
+//    }, {
+//      zoom: zoom,
+//      duration: duration / 2,
+//    },
+//    callback
+//  );
 }
 
 var feature_onHover;
@@ -307,31 +328,28 @@ document.getElementById("checkbox-basemap").addEventListener('change', function(
 });
 
 document.getElementById("checkbox-contours").addEventListener('change', function() {
-  if (this.checked) {
-    contoursLayer.setVisible(true);
-  } else {
-    contoursLayer.setVisible(false);
-  }
+  contoursLayer.setVisible(this.checked);
+});
+
+document.getElementById("checkbox-colormap").addEventListener('change', function() {
+  colormapLayer.setVisible(this.checked);
 });
 
 document.getElementById("checkbox-hillshade").addEventListener('change', function() {
   hillshadeLayer.setVisible(this.checked);
 });
 
-var showDebug = document.getElementById("checkbox-debug").checked
-debugLayer.setVisible(showDebug);
-
 document.getElementById("checkbox-debug").addEventListener('change', function() {
-  if (this.checked) {
-    debugLayer.setVisible(true);
-  } else {
-    debugLayer.setVisible(false);
-  }
+  debugLayer.setVisible(this.checked);
 });
 
 document.getElementById("checkbox-basemap").checked = true;
-document.getElementById("checkbox-contours").checked = true;
+document.getElementById("checkbox-contours").checked = false;
+document.getElementById("checkbox-colormap").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
-basemapLayer.setVisible(true);
-contoursLayer.setVisible(true);
-hillshadeLayer.setVisible(true);
+
+debugLayer.setVisible(document.getElementById("checkbox-debug").checked);
+basemapLayer.setVisible(document.getElementById("checkbox-basemap").checked);
+contoursLayer.setVisible(document.getElementById("checkbox-contours").checked);
+colormapLayer.setVisible(document.getElementById("checkbox-colormap").checked);
+hillshadeLayer.setVisible(document.getElementById("checkbox-hillshade").checked);

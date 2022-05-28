@@ -69,6 +69,9 @@ const venice = fromLonLat([12.340694942695933,45.43544087127655])
 const operaHouse = fromLonLat([151.2153396126718,-33.85659727934901])
 const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
 
+const lismore = fromLonLat([153.27707525263946,-28.80607911799792])
+const windsor = fromLonLat([150.822676436187,-33.60364397111745])
+
 var ctrInterval = 100;
 
 const view = new View({
@@ -132,10 +135,10 @@ const map = new Map({
   target: 'map',
   layers: [
     basemapLayer,
-    debugLayer,
     contoursLayer,
     hillshadeLayer,
     sealevelLayer,
+    debugLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -167,6 +170,14 @@ onClick('fly-to-venice', function() {
 
 onClick('fly-to-hawaii', function() {
   flyTo(oahuHawaii, function() {});
+});
+
+onClick('fly-to-windsor', function() {
+  flyTo(windsor, function() {});
+});
+
+onClick('fly-to-lismore', function() {
+  flyTo(lismore, function() {});
 });
 
 function flyTo(location, done) {

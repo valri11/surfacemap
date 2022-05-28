@@ -1,8 +1,3 @@
-export default {
-  build: {
-    sourcemap: true,
-  }
-}
 
 const { resolve } = require('path')
 const { defineConfig } = require('vite')

@@ -168,3 +168,55 @@ func HillshadeImage(img image.Image,
 
 	return imgOut, nil
 }
+
+func ColorReliefImage(img image.Image, gm *gradientMap) (image.Image, error) {
+
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	getHeightAtPixel := func(rgba *image.RGBA, x int, y int) float64 {
+		pix_idx := (y*width + x) * 4
+		pix := rgba.Pix[pix_idx : pix_idx+4]
+		dr := uint32(pix[0])
+		dg := uint32(pix[1])
+		db := uint32(pix[2])
+		da := uint32(pix[3])
+
+		h := rgbaToHeight(dr, dg, db, da)
+		return h
+	}
+
+	rgba := image.NewRGBA(bounds)
+	draw.Draw(rgba, bounds, img, bounds.Min, draw.Src)
+
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{width, height}
+
+	imgOut := image.NewNRGBA(image.Rectangle{upLeft, lowRight})
+
+	var wg sync.WaitGroup
+	sem := make(chan bool, MaxConcurrency)
+
+	for y := 0; y < height; y++ {
+		wg.Add(1)
+		sem <- true
+
+		y := y
+		go func() {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+
+			for x := 0; x < width; x++ {
+				h := getHeightAtPixel(rgba, x, y)
+				//col := keypoints.HeightToColor(h)
+				col := gm.HeightToColor(h)
+				imgOut.Set(x, y, col)
+			}
+		}()
+	}
+	wg.Wait()
+
+	return imgOut, nil
+}

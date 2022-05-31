@@ -17,7 +17,7 @@ const sourceTerrain = new XYZ({
   url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/terrain/{z}/{x}/{y}.img`,
   crossOrigin: 'anonymous',
   tileGrid: createXYZ({
-    minZoom: 6,
+    minZoom: 3,
     maxZoom: 15
   }),
 });
@@ -26,7 +26,7 @@ const sourceColorRelief = new XYZ({
   url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/color-relief/{z}/{x}/{y}.img`,
   crossOrigin: 'anonymous',
   tileGrid: createXYZ({
-    minZoom: 6,
+    minZoom: 3,
     maxZoom: 15
   }),
 });
@@ -111,7 +111,7 @@ const contoursLayer = new VectorTileLayer({
     url: getContoursUrl(ctrInterval),
     format: new MVT(),
     tileGrid: createXYZ({
-        minZoom: 6,
+        minZoom: 3,
         maxZoom: 15
     }),
     attributions: ['<br>Contours derived from: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Licence</a>'],

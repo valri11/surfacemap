@@ -51,7 +51,7 @@ const basemapLayer = new TileLayer({
 
 const colormapLayer = new TileLayer({
   source: sourceColorRelief,
-  opacity: 0.5,
+  opacity: 0.8,
 });
 
 // POI

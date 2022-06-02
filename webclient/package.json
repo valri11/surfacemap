@@ -2,7 +2,7 @@
   "name": "surfacemap",
   "version": "1.0.0",
   "scripts": {
-    "start": "vite --host 0.0.0.0 --port 6100 --https",
+    "start": "vite --host 0.0.0.0 --port 6100",
     "build": "vite build",
     "serve": "vite preview"
   },

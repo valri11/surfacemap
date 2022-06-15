@@ -132,9 +132,9 @@ const map = new Map({
   target: 'map',
   layers: [
     basemapLayer,
-    contoursLayer,
     colormapLayer,
     hillshadeLayer,
+    contoursLayer,
     debugLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
@@ -329,6 +329,12 @@ document.getElementById("checkbox-basemap").addEventListener('change', function(
 
 document.getElementById("checkbox-contours").addEventListener('change', function() {
   contoursLayer.setVisible(this.checked);
+  var ctrlDiv = document.getElementById("slider-id");
+  if (this.checked) {
+      ctrlDiv.style.visibility='visible';
+  } else {
+      ctrlDiv.style.visibility='hidden';
+  }
 });
 
 document.getElementById("checkbox-colormap").addEventListener('change', function() {
@@ -345,6 +351,7 @@ document.getElementById("checkbox-debug").addEventListener('change', function() 
 
 document.getElementById("checkbox-basemap").checked = true;
 document.getElementById("checkbox-contours").checked = false;
+document.getElementById("slider-id").style.visibility='hidden';
 document.getElementById("checkbox-colormap").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
 

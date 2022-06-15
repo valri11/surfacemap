@@ -11,6 +11,23 @@ import Overlay from 'ol/Overlay';
 import {Fill, Stroke, Style, Text} from 'ol/style';
 import {createXYZ} from 'ol/tilegrid';
 import {Attribution, MousePosition, defaults as defaultControls} from 'ol/control';
+import sync from 'ol-hashed';
+import VectorLayer from 'ol/layer/Vector';
+import VectorSource from 'ol/source/Vector';
+import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
+import {circular} from 'ol/geom/Polygon';
+import Control from 'ol/control/Control';
+
+// POI
+const newYork = fromLonLat([-74.04442672993127,40.69010807133021])
+const london = fromLonLat([-0.12467245895210548,51.50101981028784])
+const paris = fromLonLat([2.3360465678907536,48.85928539255598])
+const venice = fromLonLat([12.340694942695933,45.43544087127655])
+const operaHouse = fromLonLat([151.2153396126718,-33.85659727934901])
+const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
+const lismore = fromLonLat([153.27707525263946,-28.80607911799792])
+const windsor = fromLonLat([150.822676436187,-33.60364397111745])
 
 // hillshade images
 const sourceTerrain = new XYZ({
@@ -20,6 +37,11 @@ const sourceTerrain = new XYZ({
     minZoom: 3,
     maxZoom: 15
   }),
+});
+
+const sourceLocation = new VectorSource();
+const locationLayer = new VectorLayer({
+  source: sourceLocation,
 });
 
 const sourceTerra = new XYZ({
@@ -62,15 +84,6 @@ const sealevelLayer = new ImageLayer({
 });
 
 
-const newYork = fromLonLat([-74.04442672993127,40.69010807133021])
-const london = fromLonLat([-0.12467245895210548,51.50101981028784])
-const paris = fromLonLat([2.3360465678907536,48.85928539255598])
-const venice = fromLonLat([12.340694942695933,45.43544087127655])
-const operaHouse = fromLonLat([151.2153396126718,-33.85659727934901])
-const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
-
-const lismore = fromLonLat([153.27707525263946,-28.80607911799792])
-const windsor = fromLonLat([150.822676436187,-33.60364397111745])
 
 var ctrInterval = 100;
 
@@ -139,6 +152,7 @@ const map = new Map({
     hillshadeLayer,
     sealevelLayer,
     debugLayer,
+    locationLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -181,42 +195,7 @@ onClick('fly-to-lismore', function() {
 });
 
 function flyTo(location, done) {
-  const duration = 2000;
-  const zoom = view.getZoom();
-  let parts = 2;
-  let called = false;
-
-  function callback(complete) {
-    contoursLayer.setVisible(false);
-    hillshadeLayer.setVisible(false);
-    --parts;
-    if (called) {
-      return;
-    }
-    if (parts === 0 || !complete) {
-      called = true;
-      var v1 = document.getElementById("checkbox-contours").checked
-      contoursLayer.setVisible(v1);
-      var v3 = document.getElementById("checkbox-hillshade").checked
-      hillshadeLayer.setVisible(v3);
-      done(complete);
-    }
-  }
-  view.animate({
-      center: location,
-      duration: duration,
-    },
-    callback
-  );
-  view.animate({
-      zoom: zoom - 1,
-      duration: duration / 2,
-    }, {
-      zoom: zoom,
-      duration: duration / 2,
-    },
-    callback
-  );
+    view.setCenter(location);
 }
 
 var feature_onHover;
@@ -227,14 +206,20 @@ map.on('pointermove', function(evt) {
     return feature;
   });
 
-  if (feature_onHover) {
-    var content = document.getElementById('popup-content');
-    var properties = feature_onHover.getProperties()
-    console.log(JSON.stringify(properties["elevation"]));
+  if (feature_onHover == null) {
+      return;
+  }
 
+  var content = document.getElementById('popup-content');
+  var properties = feature_onHover.getProperties()
+  console.log(properties.name);
+  console.log(JSON.stringify(properties["elevation"]));
+
+  var elevationData = properties["elevation"];
+  if (elevationData) {
     var info = document.getElementById('mouse-position');
     var infoText = '<pre>';
-    infoText += 'Elevation: ' + JSON.stringify(properties["elevation"])
+    infoText += 'Elevation: ' + JSON.stringify(elevationData)
     infoText += ', '
     infoText += 'Contour interval: ' + ctrInterval + 'm';
 
@@ -248,15 +233,10 @@ map.on('pointermove', function(evt) {
     info.innerHTML = infoText;
 
     var coordinate = evt.coordinate;
-
-    content.innerHTML = '<b>Elevation:</b> ' + JSON.stringify(properties["elevation"]) + 'm';
+    content.innerHTML = '<b>Elevation:</b> ' + JSON.stringify(elevationData) + 'm';
     overlay.setPosition(coordinate);
-
-  } else {
-    //container.style.display = 'none';
   }
 });
-
 
 var mousePositionControl = new MousePosition({
   coordinateFormat: createStringXY(4),
@@ -309,10 +289,12 @@ document.getElementById("checkbox-basemap").addEventListener('change', function(
 });
 
 document.getElementById("checkbox-contours").addEventListener('change', function() {
+  contoursLayer.setVisible(this.checked);
+  var ctrlDiv = document.getElementById("slider-id");
   if (this.checked) {
-    contoursLayer.setVisible(true);
+      ctrlDiv.style.visibility='visible';
   } else {
-    contoursLayer.setVisible(false);
+      ctrlDiv.style.visibility='hidden';
   }
 });
 
@@ -324,15 +306,8 @@ document.getElementById("checkbox-hillshade").addEventListener('change', functio
   hillshadeLayer.setVisible(this.checked);
 });
 
-var showDebug = document.getElementById("checkbox-debug").checked
-debugLayer.setVisible(showDebug);
-
 document.getElementById("checkbox-debug").addEventListener('change', function() {
-  if (this.checked) {
-    debugLayer.setVisible(true);
-  } else {
-    debugLayer.setVisible(false);
-  }
+  debugLayer.setVisible(this.checked);
 });
 
 
@@ -375,10 +350,12 @@ control.addEventListener('input', listener);
 control.addEventListener('change', listener);
 output.innerText = control.value;
 
+document.getElementById("checkbox-debug").checked = false;
 document.getElementById("checkbox-basemap").checked = true;
 document.getElementById("checkbox-contours").checked = false;
 document.getElementById("checkbox-sealevel").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
+debugLayer.setVisible(false);
 basemapLayer.setVisible(true);
 contoursLayer.setVisible(false);
 sealevelLayer.setVisible(true);
@@ -387,3 +364,42 @@ hillshadeLayer.setVisible(true);
 raster.on('beforeoperations', function (event) {
   event.data.level = control.value;
 });
+
+navigator.geolocation.watchPosition(
+  function (pos) {
+    const coords = [pos.coords.longitude, pos.coords.latitude];
+    const accuracy = circular(coords, pos.coords.accuracy);
+    sourceLocation.clear(true);
+    sourceLocation.addFeatures([
+      new Feature(
+        accuracy.transform('EPSG:4326', map.getView().getProjection())
+      ),
+      new Feature(new Point(fromLonLat(coords))),
+    ]);
+  },
+  function (error) {
+    alert(`ERROR: ${error.message}`);
+  },
+  {
+    enableHighAccuracy: true,
+  }
+);
+
+const locate = document.createElement('div');
+locate.className = 'ol-control ol-unselectable locate';
+locate.innerHTML = '<button title="Locate me">◎</button>';
+locate.addEventListener('click', function () {
+  if (!sourceLocation.isEmpty()) {
+    map.getView().fit(sourceLocation.getExtent(), {
+      maxZoom: 15,
+      duration: 500,
+    });
+  }
+});
+map.addControl(
+  new Control({
+    element: locate,
+  })
+);
+
+//sync(map);

@@ -4,16 +4,9 @@ html, body {
   margin: 0;
   height: 100%;
 }
-#map-temp {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 100%;
-  height: 550px;
-}
 #map {
   width: 100%;
-  height: 490px;
+  height: 80vh;
   background: #85ccf9;
 }
 
@@ -34,5 +27,19 @@ table.controls td:nth-child(3) {
     display: inline-block;
     width: 150px;
     vertical-align: text-bottom;
+}
+
+.footer {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  margin-bottom: 20px;
+  background-color: #85ccf9;
+}
+
+.locate {
+  top: 5em;
+  left: .5em;
 }
 

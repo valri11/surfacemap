@@ -1,6 +1,5 @@
 /*
 Copyright © 2022 Val Gridnev
-
 */
 package cmd
 
@@ -50,6 +49,7 @@ func init() {
 	webserverCmd.Flags().BoolP("dev-mode", "", false, "development mode (http on loclahost)")
 	webserverCmd.Flags().String("tls-cert", "", "TLS certificate file")
 	webserverCmd.Flags().String("tls-cert-key", "", "TLS certificate key file")
+	webserverCmd.Flags().Int("port", 8000, "service port to listen")
 }
 
 const (
@@ -159,6 +159,12 @@ func mainCmd(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
+	servicePort, err := cmd.Flags().GetInt("port")
+	if err != nil {
+		log.Fatalf("ERR: %v", err)
+		return
+	}
+
 	tlsCertFile, err := cmd.Flags().GetString("tls-cert")
 	if err != nil {
 		panic(err)
@@ -201,7 +207,7 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	// start server listen with error handling
 	mux := handlers.CORS(originsOk, headersOk, methodsOk)(r)
 	srv := &http.Server{
-		Addr:         "0.0.0.0:8000",
+		Addr:         fmt.Sprintf("0.0.0.0:%d", servicePort),
 		Handler:      mux,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
@@ -359,6 +365,7 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 
 	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
 	if err != nil {
+		h.clearTileCache(ctx, z, x, y)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -366,10 +373,22 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 	h_factor := 1.0
 	altitude := 45.0
 	azimuth := 315.0
-	imgOut, err := HillshadeImage(img, pixel_res, h_factor, altitude, azimuth)
+
+	var imgOut image.Image
+	imgOut, err = HillshadeImage(img, pixel_res, h_factor, altitude, azimuth)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	var tr string
+	transp, ok := r.URL.Query()["transp"]
+	if ok {
+		tr = transp[0]
+	}
+
+	if tr == "1" {
+		imgOut = TransparentGrayscale(imgOut)
 	}
 	dt2 := time.Now()
 	log.Printf("Hillshade completed in %v", dt2.Sub(dt1))
@@ -560,6 +579,11 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Contour completed in %v\n", dt2.Sub(dtStart))
 
 	w.Write(out)
+}
+
+func (h *terra) clearTileCache(ctx context.Context, zoom int, tile_X int, tile_Y int) {
+
+	h.cacheTileStore.ClearTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
 }
 
 func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (*bytes.Buffer, error) {
@@ -781,7 +805,8 @@ func (gm *gradientMap) HeightToColor(h float64) colorful.Color {
 		if c1.Height <= h && h <= c2.Height {
 			// We are in between c1 and c2. Go blend them!
 			hBlend := (h - c1.Height) / (c2.Height - c1.Height)
-			hCol := c1.Col.BlendHcl(c2.Col, hBlend).Clamped()
+			//hCol := c1.Col.BlendHcl(c2.Col, hBlend).Clamped()
+			hCol := c1.Col.BlendRgb(c2.Col, hBlend).Clamped()
 
 			gm.lock.Lock()
 			gm.heighColors[hPos] = hCol

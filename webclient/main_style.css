@@ -6,7 +6,7 @@ html, body {
 }
 #map {
   width: 100%;
-  height: 550px;
+  height: 100%;
 }
 
 #slider-id {
@@ -21,3 +21,17 @@ table.controls td:nth-child(3) {
     text-align: right;
     min-width: 3em;
 }
+
+.footer {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.locate {
+  top: 5em;
+  left: .5em;
+}
+

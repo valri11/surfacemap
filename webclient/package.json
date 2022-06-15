@@ -10,6 +10,7 @@
     "vite": "^2.6.7"
   },
   "dependencies": {
-    "ol": "latest"
+    "ol": "^6.8.1",
+    "ol-hashed": "^2.1.0"
   }
 }

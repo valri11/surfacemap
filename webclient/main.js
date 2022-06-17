@@ -58,6 +58,7 @@ const colormapLayer = new TileLayer({
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
 const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
 const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
+const uluru = fromLonLat([131.03388514743847, -25.34584297139171])
 const mtDenali = fromLonLat([-151.00726915968875,63.069268194834244])
 const pikPobedy = fromLonLat([80.129257551509, 42.03767896555761])
 const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
@@ -159,6 +160,10 @@ onClick('fly-to-kilimanjaro', function() {
 
 onClick('fly-to-katoomba', function() {
   flyTo(katoomba, function() {});
+});
+
+onClick('fly-to-uluru', function() {
+  flyTo(uluru, function() {});
 });
 
 onClick('fly-to-denali', function() {

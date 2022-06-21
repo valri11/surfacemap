@@ -352,7 +352,6 @@ output.innerText = control.value;
 
 document.getElementById("checkbox-basemap").checked = true;
 document.getElementById("checkbox-contours").checked = false;
-document.getElementById("slider-id").style.visibility='hidden';
 document.getElementById("checkbox-sealevel").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
 basemapLayer.setVisible(true);

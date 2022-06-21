@@ -30,3 +30,8 @@ table.controls td:nth-child(3) {
   margin-bottom: 20px;
 }
 
+.locate {
+  top: 4em;
+  left: .5em;
+}
+

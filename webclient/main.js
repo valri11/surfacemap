@@ -12,6 +12,28 @@ import {Fill, Stroke, Style, Text} from 'ol/style';
 import {createXYZ} from 'ol/tilegrid';
 import {Attribution, MousePosition, defaults as defaultControls} from 'ol/control';
 import sync from 'ol-hashed';
+import VectorLayer from 'ol/layer/Vector';
+import VectorSource from 'ol/source/Vector';
+import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
+import {circular} from 'ol/geom/Polygon';
+import Control from 'ol/control/Control';
+
+// POI
+const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
+const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
+const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
+const uluru = fromLonLat([131.03388514743847, -25.34584297139171])
+const mtDenali = fromLonLat([-151.00726915968875,63.069268194834244])
+const pikPobedy = fromLonLat([80.129257551509, 42.03767896555761])
+const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
+const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
+const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
+const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
+const grandCanyon = fromLonLat([-112.09523569822798,36.10031704536186])
+const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
+const mtFuji = fromLonLat([138.73121113691982,35.363529199406074])
+const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 // hillshade images
 const sourceTerrain = new XYZ({
@@ -21,6 +43,11 @@ const sourceTerrain = new XYZ({
     minZoom: 3,
     maxZoom: 15
   }),
+});
+
+const sourceLocation = new VectorSource();
+const locationLayer = new VectorLayer({
+  source: sourceLocation,
 });
 
 const sourceColorRelief = new XYZ({
@@ -55,21 +82,6 @@ const colormapLayer = new TileLayer({
   opacity: 0.8,
 });
 
-// POI
-const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
-const khanTengri = fromLonLat([80.17411914133028, 42.213405765504476])
-const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
-const uluru = fromLonLat([131.03388514743847, -25.34584297139171])
-const mtDenali = fromLonLat([-151.00726915968875,63.069268194834244])
-const pikPobedy = fromLonLat([80.129257551509, 42.03767896555761])
-const mtEverest = fromLonLat([86.9251465845193, 27.98955908635046])
-const mtOlympus = fromLonLat([22.35011553189942, 40.08838447876729])
-const mtKilimanjaro = fromLonLat([37.35554126906301,-3.065881717083569])
-const cordilleraBlanca = fromLonLat([-77.5800702637765,-9.169719296932207])
-const grandCanyon = fromLonLat([-112.09523569822798,36.10031704536186])
-const oahuHawaii = fromLonLat([-157.80960937978762,21.26148763859345])
-const mtFuji = fromLonLat([138.73121113691982,35.363529199406074])
-const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 var ctrInterval = 100;
 
@@ -138,6 +150,7 @@ const map = new Map({
     hillshadeLayer,
     contoursLayer,
     debugLayer,
+    locationLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -366,5 +379,42 @@ basemapLayer.setVisible(document.getElementById("checkbox-basemap").checked);
 contoursLayer.setVisible(document.getElementById("checkbox-contours").checked);
 colormapLayer.setVisible(document.getElementById("checkbox-colormap").checked);
 hillshadeLayer.setVisible(document.getElementById("checkbox-hillshade").checked);
+
+navigator.geolocation.watchPosition(
+  function (pos) {
+    const coords = [pos.coords.longitude, pos.coords.latitude];
+    const accuracy = circular(coords, pos.coords.accuracy);
+    sourceLocation.clear(true);
+    sourceLocation.addFeatures([
+      new Feature(
+        accuracy.transform('EPSG:4326', map.getView().getProjection())
+      ),
+      new Feature(new Point(fromLonLat(coords))),
+    ]);
+  },
+  function (error) {
+    alert(`ERROR: ${error.message}`);
+  },
+  {
+    enableHighAccuracy: true,
+  }
+);
+
+const locate = document.createElement('div');
+locate.className = 'ol-control ol-unselectable locate';
+locate.innerHTML = '<button title="Locate me">◎</button>';
+locate.addEventListener('click', function () {
+  if (!sourceLocation.isEmpty()) {
+    map.getView().fit(sourceLocation.getExtent(), {
+      maxZoom: 15,
+      duration: 500,
+    });
+  }
+});
+map.addControl(
+  new Control({
+    element: locate,
+  })
+);
 
 sync(map);

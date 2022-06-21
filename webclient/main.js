@@ -11,6 +11,7 @@ import Overlay from 'ol/Overlay';
 import {Fill, Stroke, Style, Text} from 'ol/style';
 import {createXYZ} from 'ol/tilegrid';
 import {Attribution, MousePosition, defaults as defaultControls} from 'ol/control';
+import sync from 'ol-hashed';
 
 // hillshade images
 const sourceTerrain = new XYZ({
@@ -365,3 +366,5 @@ basemapLayer.setVisible(document.getElementById("checkbox-basemap").checked);
 contoursLayer.setVisible(document.getElementById("checkbox-contours").checked);
 colormapLayer.setVisible(document.getElementById("checkbox-colormap").checked);
 hillshadeLayer.setVisible(document.getElementById("checkbox-hillshade").checked);
+
+sync(map);

@@ -7,6 +7,7 @@ html, body {
 #map {
   width: 100%;
   height: 100%;
+  background: #85ccf9;
 }
 
 #slider-id {
@@ -31,7 +32,7 @@ table.controls td:nth-child(3) {
 }
 
 .locate {
-  top: 4em;
+  top: 5em;
   left: .5em;
 }
 

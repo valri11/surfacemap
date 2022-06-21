@@ -9,6 +9,7 @@ html, body {
   height: 100%;
   background: #85ccf9;
 }
+
 #slider-id {
     width: 492px;
     margin: 10px;
@@ -35,5 +36,10 @@ table.controls td:nth-child(3) {
   width: 100%;
   margin-bottom: 20px;
   background-color: #85ccf9;
+}
+
+.locate {
+  top: 5em;
+  left: .5em;
 }
 

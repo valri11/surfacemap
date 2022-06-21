@@ -218,42 +218,6 @@ onClick('fly-to-mariana', function() {
 
 function flyTo(location, done) {
     view.setCenter(location);
-//  const duration = 2000;
-//  const zoom = view.getZoom();
-//  let parts = 2;
-//  let called = false;
-//
-//  function callback(complete) {
-//    contoursLayer.setVisible(false);
-//    hillshadeLayer.setVisible(false);
-//    --parts;
-//    if (called) {
-//      return;
-//    }
-//    if (parts === 0 || !complete) {
-//      called = true;
-//      var v1 = document.getElementById("checkbox-contours").checked
-//      contoursLayer.setVisible(v1);
-//      var v3 = document.getElementById("checkbox-hillshade").checked
-//      hillshadeLayer.setVisible(v3);
-//      done(complete);
-//    }
-//  }
-//  view.animate({
-//      center: location,
-//      duration: duration,
-//    },
-//    callback
-//  );
-//  view.animate({
-//      zoom: zoom - 1,
-//      duration: duration / 2,
-//    }, {
-//      zoom: zoom,
-//      duration: duration / 2,
-//    },
-//    callback
-//  );
 }
 
 var feature_onHover;
@@ -264,15 +228,20 @@ map.on('pointermove', function(evt) {
     return feature;
   });
 
-  if (feature_onHover) {
-    var content = document.getElementById('popup-content');
-    var properties = feature_onHover.getProperties()
-    console.log(properties.name);
-    console.log(JSON.stringify(properties["elevation"]));
+  if (feature_onHover == null) {
+      return;
+  }
 
+  var content = document.getElementById('popup-content');
+  var properties = feature_onHover.getProperties()
+  console.log(properties.name);
+  console.log(JSON.stringify(properties["elevation"]));
+
+  var elevationData = properties["elevation"];
+  if (elevationData) {
     var info = document.getElementById('mouse-position');
     var infoText = '<pre>';
-    infoText += 'Elevation: ' + JSON.stringify(properties["elevation"])
+    infoText += 'Elevation: ' + JSON.stringify(elevationData)
     infoText += ', '
     infoText += 'Contour interval: ' + ctrInterval + 'm';
 
@@ -286,15 +255,10 @@ map.on('pointermove', function(evt) {
     info.innerHTML = infoText;
 
     var coordinate = evt.coordinate;
-
-    content.innerHTML = '<b>Elevation:</b> ' + JSON.stringify(properties["elevation"]) + 'm';
+    content.innerHTML = '<b>Elevation:</b> ' + JSON.stringify(elevationData) + 'm';
     overlay.setPosition(coordinate);
-
-  } else {
-    //container.style.display = 'none';
   }
 });
-
 
 var mousePositionControl = new MousePosition({
   coordinateFormat: createStringXY(4),

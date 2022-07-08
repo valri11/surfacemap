@@ -26,6 +26,7 @@ import {toStringHDMS} from 'ol/coordinate';
 // POI
 const katoomba = fromLonLat([150.3120553998699, -33.73196775624329])
 const asquith = fromLonLat([151.1078953589041,-33.68867268311981])
+const sydney = fromLonLat([151.2061999882396,-33.8732161200895])
 
 const labelStyle = new Style({
   text: new Text({
@@ -76,9 +77,9 @@ const sourceFuelWatch = new VectorSource({
      xhr.onload = function() {
        if (xhr.status == 200) {
          var features = sourceFuelWatch.getFormat().readFeatures(xhr.responseText, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857',
-    });
+           dataProjection: 'EPSG:4326',
+           featureProjection: 'EPSG:3857',
+         });
          sourceFuelWatch.addFeatures(features);
          success(features);
        } else {
@@ -177,6 +178,10 @@ onClick('fly-to-asquith', function() {
 
 onClick('fly-to-katoomba', function() {
   flyTo(katoomba, function() {});
+});
+
+onClick('fly-to-sydney', function() {
+  flyTo(sydney, function() {});
 });
 
 function flyTo(location, done) {

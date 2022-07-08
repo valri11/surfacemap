@@ -209,6 +209,7 @@ map.on('pointermove', function(evt) {
   }
 
   var price = properties["price"];
+  var addr = JSON.stringify(properties["address"]);
 
   var info = document.getElementById('mouse-position');
   var infoText = '<pre>';
@@ -216,9 +217,10 @@ map.on('pointermove', function(evt) {
   infoText += '\n';
   infoText += 'Price: ' + JSON.stringify(price);
   infoText += '\n';
-  infoText += 'Address: ' + JSON.stringify(properties["address"]);
+  infoText += 'Address: ' + addr;
   infoText += '\n';
   infoText += '</pre>';
+  infoText += `<a href="https://maps.google.com/?q=${addr}">` + addr + '</a>';
   info.innerHTML = infoText;
 
   var coordinate = evt.coordinate;

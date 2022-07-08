@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="https://openlayers.org/favicon.ico" />
+  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/themes/base/jquery-ui.css" type="text/css" media="all" />
+<script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.5.min.js" type="text/javascript"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/jquery-ui.min.js" type="text/javascript"></script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fuel Near Me Map</title>
+</head>
+
+<body>
+  <div id="map" class="map"></div>
+  <div class="footer">
+    <input type="checkbox" id="checkbox-debug" name="checkbox-debug">
+    <label for="checkbox-debug">Show debug layer</label>
+    <div>
+      <input type="checkbox" id="checkbox-ft-E10" name="checkbox-ft-E10" checked>
+      <label for="checkbox-ft-E10">Fuel E10</label>
+      <input type="checkbox" id="checkbox-ft-P95" name="checkbox-ft-P95">
+      <label for="checkbox-ft-P95">Fuel P95</label>
+    </div>
+    <button id="fly-to-asquith">Asquith</button>
+    <button id="fly-to-katoomba">Katoomba</button>
+  <fieldset>
+    <legend>Fuel type:</legend>
+
+    <div>
+      <input type="radio" id="radio-ft-e10" name="fueltype" value="E10"
+             checked>
+      <label for="radio-ft-e10">E10</label>
+    </div>
+    <div>
+      <input type="radio" id="radio-ft-p95" name="fueltype" value="P95">
+      <label for="radio-ft-p95">P95</label>
+    </div>
+  </fieldset>
+  </div>
+
+
+  <div id="popup" class="ol-popup">
+    <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+    <div id="popup-content"></div>
+  </div>
+
+  <div id="mouse-position"></div>
+
+  <script type="module" src="./fuelnearme.js"></script>
+</body>
+
+</html>

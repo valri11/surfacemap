@@ -8,7 +8,8 @@ module.exports = defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        nested: resolve(__dirname, 'sealevel.html')
+        sealevel: resolve(__dirname, 'sealevel.html'),
+        fuelnearme: resolve(__dirname, 'fuelnearme.html')
       }
     }
   }

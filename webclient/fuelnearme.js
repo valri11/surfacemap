@@ -90,9 +90,11 @@ const sourceFuelWatch = new VectorSource({
    strategy: bbox
 });
 
-const fuelWatchLayer = new VectorLayer({
-    source: sourceFuelWatch,
-    style: new Style({
+function pointStyleFunction(feature, resolution) {
+  var properties = feature.getProperties()
+  var price = properties["price"];
+  var textValue = JSON.stringify(price);
+  return new Style({
      image: new Circle({
        radius: 8,
        fill: new Fill({
@@ -103,8 +105,19 @@ const fuelWatchLayer = new VectorLayer({
          width: 4,
        }),
      }),
+    text: new Text({
+        textAlign: "left",
+        offsetX: 14,
+        text: textValue,
+        font: 'bold 14px Calibri,sans-serif',
+    }),
      zIndex: Infinity,
-   }),
+  });
+}
+
+const fuelWatchLayer = new VectorLayer({
+    source: sourceFuelWatch,
+    style: pointStyleFunction,
 });
 
 const sourceLocation = new VectorSource();
@@ -184,8 +197,6 @@ map.on('pointermove', function(evt) {
 
   var content = document.getElementById('popup-content');
   var properties = feature_onHover.getProperties()
-  console.log(properties.name);
-  console.log(JSON.stringify(properties["elevation"]));
 
   var fuelType = properties["fueltype"];
   if (fuelType == null) {

@@ -350,10 +350,12 @@ control.addEventListener('input', listener);
 control.addEventListener('change', listener);
 output.innerText = control.value;
 
+document.getElementById("checkbox-debug").checked = false;
 document.getElementById("checkbox-basemap").checked = true;
 document.getElementById("checkbox-contours").checked = false;
 document.getElementById("checkbox-sealevel").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
+debugLayer.setVisible(false);
 basemapLayer.setVisible(true);
 contoursLayer.setVisible(false);
 sealevelLayer.setVisible(true);
@@ -400,4 +402,4 @@ map.addControl(
   })
 );
 
-sync(map);
+//sync(map);

@@ -14,6 +14,13 @@
 
 <body>
   <div id="map" class="map"></div>
+  <div style="margin-top: 10px;margin-bottom: 10px;">
+    <label>
+      Sea level
+      <input id="level" type="range" min="0" max="200" value="0"/>
+      +<span id="output"></span> m
+    </label>
+  </div>
   <div>
     <input type="checkbox" id="checkbox-debug" name="checkbox-debug">
     <label for="checkbox-debug">Show debug layer</label>
@@ -26,8 +33,8 @@
     <label for="checkbox-sealevel">Show sealevel</label>
     <input type="checkbox" id="checkbox-hillshade" name="checkbox-hillshade" checked>
     <label for="checkbox-hillshade">Show hillshade</label>
-    </div>
-    <div id="slider-id"><div class="ui-slider-handle"></div></div>
+  </div>
+  <div id="slider-id"><div class="ui-slider-handle"></div></div>
     <button id="fly-to-sydney">Sydney</button>
     <button id="fly-to-windsor">Windsor</button>
     <button id="fly-to-lismore">Lismore</button>
@@ -40,14 +47,6 @@
   <div id="popup" class="ol-popup">
     <a href="#" id="popup-closer" class="ol-popup-closer"></a>
     <div id="popup-content"></div>
-  </div>
-  <div>
-  <br>
-    <label>
-      Sea level
-      <input id="level" type="range" min="0" max="200" value="1"/>
-      +<span id="output"></span> m
-    </label>
   </div>
   <div id="mouse-position"></div>
   <script type="module" src="./sealevel.js"></script>

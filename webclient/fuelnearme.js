@@ -97,20 +97,20 @@ function pointStyleFunction(feature, resolution) {
   var textValue = JSON.stringify(price);
   return new Style({
      image: new Circle({
-       radius: 8,
+       radius: 14,
        fill: new Fill({
          color: [0, 153, 255, 1],
        }),
        stroke: new Stroke({
          color: [255, 255, 255, 1],
-         width: 4,
+         width: 6,
        }),
      }),
     text: new Text({
         textAlign: "left",
         offsetX: 14,
         text: textValue,
-        font: 'bold 14px Calibri,sans-serif',
+        font: 'bold 16px Calibri,sans-serif',
     }),
      zIndex: Infinity,
   });
@@ -119,6 +119,8 @@ function pointStyleFunction(feature, resolution) {
 const fuelWatchLayer = new VectorLayer({
     source: sourceFuelWatch,
     style: pointStyleFunction,
+    declutter: true,
+    minZoom: 12,
 });
 
 const sourceLocation = new VectorSource();
@@ -211,6 +213,7 @@ map.on('pointermove', function(evt) {
   var price = properties["price"];
   var addr = JSON.stringify(properties["address"]);
   var addrEsc = encodeURIComponent(addr);
+  var addrLink = `<a href="https://www.google.com/maps/search/?api=1&query=${addrEsc}">` + addr + '</a>';
 
   var info = document.getElementById('mouse-position');
   var infoText = '<pre>';
@@ -218,10 +221,9 @@ map.on('pointermove', function(evt) {
   infoText += '\n';
   infoText += 'Price: ' + JSON.stringify(price);
   infoText += '\n';
-  infoText += 'Address: ' + addr;
-  infoText += '\n';
+  infoText += `${addrLink}`;
+  //infoText += '\n';
   infoText += '</pre>';
-  infoText += `<a href="https://www.google.com/maps/search/?api=1&query=${addrEsc}">` + addr + '</a>';
   info.innerHTML = infoText;
 
   var coordinate = evt.coordinate;

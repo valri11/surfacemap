@@ -8,6 +8,57 @@ import (
 	"sync"
 )
 
+func TransparentGrayscale(img image.Image) image.Image {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	toTransparentPixel := func(rgba *image.NRGBA, x int, y int) color.Color {
+		pix_idx := (y*width + x) * 4
+		pix := rgba.Pix[pix_idx : pix_idx+4]
+		dr := pix[0]
+		//dg := uint32(pix[1])
+		//db := uint32(pix[2])
+		//da := uint32(pix[3])
+
+		//col := color.NRGBA{uint8(dr), uint8(dg), uint8(db), uint8(255)}
+		//col := color.NRGBA{uint8(dr), uint8(dg), uint8(db), uint8(255) - uint8(dr)}
+		col := color.NRGBA{0, 0, 0, 255 - dr}
+		return col
+	}
+
+	rgba := image.NewNRGBA(bounds)
+	draw.Draw(rgba, bounds, img, bounds.Min, draw.Src)
+
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{width, height}
+
+	imgOut := image.NewNRGBA(image.Rectangle{upLeft, lowRight})
+
+	var wg sync.WaitGroup
+	sem := make(chan bool, MaxConcurrency)
+
+	for y := 0; y < height; y++ {
+		wg.Add(1)
+		sem <- true
+
+		y := y
+		go func() {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+
+			for x := 0; x < width; x++ {
+				col := toTransparentPixel(rgba, x, y)
+				imgOut.Set(x, y, col)
+			}
+		}()
+	}
+	wg.Wait()
+
+	return imgOut
+}
+
 func HillshadeImage(img image.Image,
 	pixel_res float64,
 	h_factor float64,

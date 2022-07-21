@@ -366,10 +366,22 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 	h_factor := 1.0
 	altitude := 45.0
 	azimuth := 315.0
-	imgOut, err := HillshadeImage(img, pixel_res, h_factor, altitude, azimuth)
+
+	var imgOut image.Image
+	imgOut, err = HillshadeImage(img, pixel_res, h_factor, altitude, azimuth)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	var tr string
+	transp, ok := r.URL.Query()["transp"]
+	if ok {
+		tr = transp[0]
+	}
+
+	if tr == "1" {
+		imgOut = TransparentGrayscale(imgOut)
 	}
 	dt2 := time.Now()
 	log.Printf("Hillshade completed in %v", dt2.Sub(dt1))

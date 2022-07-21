@@ -45,6 +45,15 @@ const sourceTerrain = new XYZ({
   }),
 });
 
+const sourceTerrainV2 = new XYZ({
+  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/terrain/{z}/{x}/{y}.img?transp=1`,
+  crossOrigin: 'anonymous',
+  tileGrid: createXYZ({
+    minZoom: 3,
+    maxZoom: 15
+  }),
+});
+
 const sourceLocation = new VectorSource();
 const locationLayer = new VectorLayer({
   source: sourceLocation,
@@ -70,6 +79,11 @@ const debugLayer = new TileLayer({
 
 const hillshadeLayer = new TileLayer({
   source: sourceTerrain,
+  opacity: 0.3,
+});
+
+const hillshadeV2Layer = new TileLayer({
+  source: sourceTerrainV2,
   opacity: 0.3,
 });
 
@@ -148,6 +162,7 @@ const map = new Map({
     basemapLayer,
     colormapLayer,
     hillshadeLayer,
+    hillshadeV2Layer,
     contoursLayer,
     debugLayer,
     locationLayer,
@@ -328,6 +343,10 @@ document.getElementById("checkbox-hillshade").addEventListener('change', functio
   hillshadeLayer.setVisible(this.checked);
 });
 
+document.getElementById("checkbox-hillshade-2").addEventListener('change', function() {
+  hillshadeV2Layer.setVisible(this.checked);
+});
+
 document.getElementById("checkbox-debug").addEventListener('change', function() {
   debugLayer.setVisible(this.checked);
 });
@@ -337,12 +356,14 @@ document.getElementById("checkbox-contours").checked = false;
 document.getElementById("slider-id").style.visibility='hidden';
 document.getElementById("checkbox-colormap").checked = true;
 document.getElementById("checkbox-hillshade").checked = true;
+document.getElementById("checkbox-hillshade-2").checked = false;
 
 debugLayer.setVisible(document.getElementById("checkbox-debug").checked);
 basemapLayer.setVisible(document.getElementById("checkbox-basemap").checked);
 contoursLayer.setVisible(document.getElementById("checkbox-contours").checked);
 colormapLayer.setVisible(document.getElementById("checkbox-colormap").checked);
 hillshadeLayer.setVisible(document.getElementById("checkbox-hillshade").checked);
+hillshadeV2Layer.setVisible(document.getElementById("checkbox-hillshade-2").checked);
 
 navigator.geolocation.watchPosition(
   function (pos) {

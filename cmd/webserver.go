@@ -793,7 +793,8 @@ func (gm *gradientMap) HeightToColor(h float64) colorful.Color {
 		if c1.Height <= h && h <= c2.Height {
 			// We are in between c1 and c2. Go blend them!
 			hBlend := (h - c1.Height) / (c2.Height - c1.Height)
-			hCol := c1.Col.BlendHcl(c2.Col, hBlend).Clamped()
+			//hCol := c1.Col.BlendHcl(c2.Col, hBlend).Clamped()
+			hCol := c1.Col.BlendRgb(c2.Col, hBlend).Clamped()
 
 			gm.lock.Lock()
 			gm.heighColors[hPos] = hCol

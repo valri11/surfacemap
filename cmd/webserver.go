@@ -1,6 +1,5 @@
 /*
 Copyright © 2022 Val Gridnev
-
 */
 package cmd
 
@@ -50,6 +49,7 @@ func init() {
 	webserverCmd.Flags().BoolP("dev-mode", "", false, "development mode (http on loclahost)")
 	webserverCmd.Flags().String("tls-cert", "", "TLS certificate file")
 	webserverCmd.Flags().String("tls-cert-key", "", "TLS certificate key file")
+	webserverCmd.Flags().Int("port", 8000, "service port to listen")
 }
 
 const (
@@ -159,6 +159,12 @@ func mainCmd(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
+	servicePort, err := cmd.Flags().GetInt("port")
+	if err != nil {
+		log.Fatalf("ERR: %v", err)
+		return
+	}
+
 	tlsCertFile, err := cmd.Flags().GetString("tls-cert")
 	if err != nil {
 		panic(err)
@@ -201,7 +207,7 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	// start server listen with error handling
 	mux := handlers.CORS(originsOk, headersOk, methodsOk)(r)
 	srv := &http.Server{
-		Addr:         "0.0.0.0:8000",
+		Addr:         fmt.Sprintf("0.0.0.0:%d", servicePort),
 		Handler:      mux,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,

@@ -9,4 +9,4 @@ RUN go build -o /surfacemap
 
 EXPOSE 8000
 
-CMD [ "/salesnearme" ]
+CMD [ "/surfacemap" ]

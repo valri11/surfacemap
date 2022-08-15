@@ -365,6 +365,7 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 
 	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
 	if err != nil {
+		h.clearTileCache(ctx, z, x, y)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -578,6 +579,11 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Contour completed in %v\n", dt2.Sub(dtStart))
 
 	w.Write(out)
+}
+
+func (h *terra) clearTileCache(ctx context.Context, zoom int, tile_X int, tile_Y int) {
+
+	h.cacheTileStore.ClearTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
 }
 
 func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (*bytes.Buffer, error) {

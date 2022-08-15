@@ -17,6 +17,7 @@ var (
 
 type TileStore interface {
 	GetTile(ctx context.Context, z uint32, x uint32, y uint32) ([]byte, error)
+	ClearTile(ctx context.Context, z uint32, x uint32, y uint32)
 }
 
 type S3TileStore struct {
@@ -42,6 +43,9 @@ func NewS3TileStore(s3Client *s3.Client, bucketName string, tileNameTempl string
 		tileNameTempl: tileNameTempl,
 	}
 	return &ts, nil
+}
+
+func (ts *S3TileStore) ClearTile(ctx context.Context, z uint32, x uint32, y uint32) {
 }
 
 func (ts *S3TileStore) GetTile(ctx context.Context, z uint32, x uint32, y uint32) ([]byte, error) {
@@ -75,6 +79,12 @@ func NewCacheTileStore(tileNameTempl string, cacheSize int) (*CacheTileStore, er
 		tileNameTempl: tileNameTempl,
 	}
 	return &ts, nil
+}
+
+func (ts *CacheTileStore) ClearTile(ctx context.Context, z uint32, x uint32, y uint32) {
+	oName := fmt.Sprintf(ts.tileNameTempl, z, x, y)
+
+	ts.tileCache.Remove(oName)
 }
 
 func (ts *CacheTileStore) GetTile(ctx context.Context, z uint32, x uint32, y uint32) ([]byte, error) {

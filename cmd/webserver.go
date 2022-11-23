@@ -195,6 +195,7 @@ func mainCmd(cmd *cobra.Command, args []string) {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/terra/{z}/{x}/{y}.img", t.tilesHandler)
+	r.HandleFunc("/terra512/{z}/{x}/{y}.img", t.tiles512Handler)
 	r.HandleFunc("/terrain/{z}/{x}/{y}.img", t.tilesTerrainHandler)
 	r.HandleFunc("/contours/{z}/{x}/{y}.{format}", t.tilesContoursHandler)
 	r.HandleFunc("/color-relief/{z}/{x}/{y}.img", t.colorReliefHandler)
@@ -259,6 +260,127 @@ func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
 	out := buf.Bytes()
 
 	w.Write(out)
+}
+
+func (h *terra) tiles512Handler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+
+	log.Printf("Tiles512 params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+
+	z, err := strconv.Atoi(vars["z"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	x, err := strconv.Atoi(vars["x"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	y, err := strconv.Atoi(vars["y"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	z1 := z + 1
+	dx := x * 2
+	dy := y * 2
+
+	// 0 | 1
+	// 2 | 3
+
+	arr := make([]*bytes.Buffer, 4)
+
+	arr[0], err = h.getTile(ctx, z1, dx, dy)
+	if err != nil {
+		log.Printf("req: ERR: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	arr[1], err = h.getTile(ctx, z1, dx+1, dy)
+	if err != nil {
+		log.Printf("req: ERR: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	arr[2], err = h.getTile(ctx, z1, dx, dy+1)
+	if err != nil {
+		log.Printf("req: ERR: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	arr[3], err = h.getTile(ctx, z1, dx+1, dy+1)
+	if err != nil {
+		log.Printf("req: ERR: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	tileSize := 512
+	dst := image.NewRGBA(image.Rect(0, 0, tileSize, tileSize))
+
+	img0, _, err := image.Decode(arr[0])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	img1, _, err := image.Decode(arr[1])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	img2, _, err := image.Decode(arr[2])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	img3, _, err := image.Decode(arr[3])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	draw.Draw(dst,
+		image.Rect(0, 0, 256, 256),
+		img0,
+		image.Rect(0, 0, 256, 256).Min,
+		draw.Src)
+
+	draw.Draw(dst,
+		image.Rect(256, 0, 512, 256),
+		img1,
+		image.Rect(0, 0, 256, 256).Min,
+		draw.Src)
+
+	draw.Draw(dst,
+		image.Rect(0, 256, 256, 512),
+		img2,
+		image.Rect(0, 0, 256, 256).Min,
+		draw.Src)
+
+	draw.Draw(dst,
+		image.Rect(256, 256, 512, 512),
+		img3,
+		image.Rect(0, 0, 256, 256).Min,
+		draw.Src)
+
+	w.Header().Set("Content-Type", "image/png")
+
+	out := &bytes.Buffer{}
+
+	err = (&png.Encoder{CompressionLevel: png.DefaultCompression}).Encode(out, dst)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Write(out.Bytes())
 }
 
 func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {

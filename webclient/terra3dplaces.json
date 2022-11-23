@@ -1,0 +1,185 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        150.3120553998699, -33.73196775624329
+        ]
+      },
+      "properties": {
+        "name": "Katoomba"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        131.03388514743847, -25.34584297139171
+        ]
+      },
+      "properties": {
+        "name": "Uluru"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        74.57950579031711, 42.51248314829303
+        ]
+      },
+      "properties": {
+        "name": "Tian Shan"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        80.17411914133028, 42.213405765504476
+        ]
+      },
+      "properties": {
+        "name": "Khan Tengri"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        -151.00726915968875,63.069268194834244
+        ]
+      },
+      "properties": {
+        "name": "Mt Denali"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        80.129257551509, 42.03767896555761
+        ]
+      },
+      "properties": {
+        "name": "Pik Pobedy"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        86.9251465845193, 27.98955908635046
+        ]
+      },
+      "properties": {
+        "name": "Mt Everest"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        22.35011553189942, 40.08838447876729
+        ]
+      },
+      "properties": {
+        "name": "Mt Olympus"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        37.35554126906301,-3.065881717083569
+        ]
+      },
+      "properties": {
+        "name": "Mt Kilimanjaro"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        -77.5800702637765,-9.169719296932207
+        ]
+      },
+      "properties": {
+        "name": "Cordillera Blanca"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        -112.09523569822798,36.10031704536186
+        ]
+      },
+      "properties": {
+        "name": "Grand Canyon"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        -157.80960937978762,21.26148763859345
+        ]
+      },
+      "properties": {
+        "name": "Oahu"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        138.73121113691982,35.363529199406074
+        ]
+      },
+      "properties": {
+        "name": "Mt Fuji"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        174.06318456572237,-39.29411143972212
+        ]
+      },
+      "properties": {
+        "name": "Mt Taranaki"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        8.947253027980032,45.97757518134668
+        ]
+      },
+      "properties": {
+        "name": "Swiss Alps"
+      }
+    }
+ ]
+}

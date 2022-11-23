@@ -11,23 +11,16 @@
 </head>
 
 <body>
+  <h1 id="title"></h1>
+  <h2 id="subtitle"></h2>
   <div id="map" class="map"></div>
-  <div class="footer">
-    <button id="fly-to-kg">KG</button>
-    <button id="fly-to-khan-tengri">Khan Tengri</button>
-    <button id="fly-to-pik-pobedy">Pik Pobedy</button>
-    <button id="fly-to-everest">Mt Everest</button>
-    <button id="fly-to-katoomba">Katoomba</button>
-    <button id="fly-to-uluru">Uluru</button>
-    <button id="fly-to-denali">Mt Denali</button>
-    <button id="fly-to-oahu">Oahu</button>
-    <button id="fly-to-grand-canyon">Grand Canyon</button>
-    <button id="fly-to-cordillera">Cordillera Blanca</button>
-    <button id="fly-to-kilimanjaro">Mt Kilimanjaro</button>
-    <button id="fly-to-olympus">Mt Olympus</button>
-    <button id="fly-to-fuji">Mt Fuji</button>
-    <button id="fly-to-taranaki">Mt Taranaki</button>
-    <button id="fly-to-swissalps">Swiss Alps</button>
+  <div id="places-list-overlay">
+    <a href="https://github.com/valri11/surfacemap/">
+        <img style="position: absolute; top: 0; left: 0; border: 0; z-index: 10000" src="https://s3.amazonaws.com/github/ribbons/forkme_left_red_aa0000.png" alt="Fork me on GitHub">
+    </a>
+    <h2>World Map 3D</h2>
+    <h1>Choose a place to visit</h1>
+    <ul id="places-list"></ul>
   </div>
 
   <script type="module" src="./terra3d.js"></script>

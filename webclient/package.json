@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "ol": "^6.8.1",
-    "ol-hashed": "^2.1.0"
+    "ol-hashed": "^2.1.0",
+    "procedural-gl": "^1.0.19"
   }
 }

@@ -16,6 +16,7 @@ const cordilleraBlanca = [-77.5800702637765,-9.169719296932207]
 const grandCanyon = [-112.09523569822798,36.10031704536186]
 const oahuHawaii = [-157.80960937978762,21.26148763859345]
 const mtFuji = [138.73121113691982,35.363529199406074]
+const mtTaranaki = [174.06318456572237,-39.29411143972212]
 
 const basemap_default = 'arc';
 var basemap = (new URLSearchParams(window.location.search)).get('basemap');
@@ -120,6 +121,10 @@ onClick('fly-to-oahu', function() {
 
 onClick('fly-to-fuji', function() {
   flyTo(mtFuji, function() {});
+});
+
+onClick('fly-to-taranaki', function() {
+  flyTo(mtTaranaki, function() {});
 });
 
 

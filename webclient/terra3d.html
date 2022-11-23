@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="https://openlayers.org/favicon.ico" />
+  <meta name="viewport" content="user-scalable=no, width=device-width, height=device-height, maximum-scale=1.0, minimum-scale=1.0, initial-scale=1.0">
+  <title>Surface 3D Map</title>
+  <link rel="stylesheet" href="./terra3d.css">
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/css/autoComplete.min.css">
+</head>
+
+<body>
+  <h1 id="title"></h1>
+  <h2 id="subtitle"></h2>
+  <div id="map" class="map"></div>
+    <div class="autoComplete_wrapper" style="left: 60px;top: 10px;">
+        <input id="autoComplete" type="search" dir="ltr" spellcheck=false autocorrect="off" autocomplete="off" autocapitalize="off">
+    </div>
+  <div id="places-list-overlay">
+    <a href="https://github.com/valri11/surfacemap/">
+        <img style="position: absolute; top: 0; left: 0; border: 0; z-index: 10000" src="https://s3.amazonaws.com/github/ribbons/forkme_left_red_aa0000.png" alt="Fork me on GitHub">
+    </a>
+    <h2>World Map 3D</h2>
+    <h1>Choose a place to visit</h1>
+    <ul id="places-list"></ul>
+  </div>
+
+  <script type="module" src="./terra3d.js"></script>
+</body>
+
+</html>

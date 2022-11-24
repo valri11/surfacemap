@@ -10,6 +10,7 @@
     "vite": "^2.6.7"
   },
   "dependencies": {
+    "@tarekraafat/autocomplete.js": "^10.2.7",
     "ol": "^6.8.1",
     "ol-hashed": "^2.1.0",
     "procedural-gl": "^1.0.19"

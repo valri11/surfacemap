@@ -2,6 +2,7 @@ import './terra3d.css';
 import * as env from './env.json';
 import * as places from './terra3dplaces.json';
 import Procedural from 'procedural-gl';
+import autoComplete from '@tarekraafat/autocomplete.js';
 
 const placesList = document.getElementById('places-list');
 const placesListOverlay = document.getElementById('places-list-overlay');
@@ -91,9 +92,10 @@ if (places.features.length > 0) {
 
 navigator.geolocation.watchPosition(
   function (pos) {
-    //const coords = [pos.coords.longitude, pos.coords.latitude];
+    const coords = [pos.coords.longitude, pos.coords.latitude];
     //const accuracy = circular(coords, pos.coords.accuracy);
     Procedural.setUserLocation(pos);
+    title.innerHTML = `${coords[0]}, ${coords[1]}`;
   },
   function (error) {
     alert(`ERROR: ${error.message}`);
@@ -103,3 +105,44 @@ navigator.geolocation.watchPosition(
   }
 );
 
+
+const autoCompleteJS = new autoComplete({
+    placeHolder: "(Lat,Lon)",
+    data: {
+    src: async (query) => {
+      try {
+            var arrCoord = query.split(",").map(Number);
+            if (arrCoord.length != 2) {
+                return [];
+            }
+
+            var arr = [query];
+            return arr;
+      } catch (error) {
+            return error;
+      }
+    }
+    },
+    resultItem: {
+        highlight: true
+    },
+    events: {
+        input: {
+            selection: (event) => {
+                const selection = event.detail.selection.value;
+                autoCompleteJS.input.value = selection;
+                
+                var feat = {
+                    "type": "Feature",
+                    "geometry": {"type":"Point", 
+                        "coordinates":[]},
+                        "properties":{"name":""}
+                };
+                var arrCoord = selection.split(",").map(Number);
+                feat.geometry.coordinates = [arrCoord[1], arrCoord[0]];
+                feat.properties['name'] = selection;
+                loadPlace(feat);
+            }
+        }
+    }
+});

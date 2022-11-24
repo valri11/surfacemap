@@ -113,7 +113,7 @@ const autoCompleteJS = new autoComplete({
     data: {
     src: async (query) => {
           try {
-                url: `${env.geocoder.proto}://${env.geocoder.host}:${env.geocoder.port}/geocode?q=${query}`;
+                var url = `${env.geocoder.proto}://${env.geocoder.host}:${env.geocoder.port}/geocode?q=${query}`;
                 const source = await fetch(url);
                 // Format data into JSON
                 const data = await source.json();

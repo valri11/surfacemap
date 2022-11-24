@@ -95,7 +95,7 @@ navigator.geolocation.watchPosition(
     const coords = [pos.coords.longitude, pos.coords.latitude];
     //const accuracy = circular(coords, pos.coords.accuracy);
     Procedural.setUserLocation(pos);
-    title.innerHTML = `${coords[0]}, ${coords[1]}`;
+    //title.innerHTML = `${coords[0]}, ${coords[1]}`;
   },
   function (error) {
     alert(`ERROR: ${error.message}`);

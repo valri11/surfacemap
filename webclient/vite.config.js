@@ -9,7 +9,6 @@ module.exports = defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         sealevel: resolve(__dirname, 'sealevel.html'),
-        fuelnearme: resolve(__dirname, 'fuelnearme.html'),
         terra3d: resolve(__dirname, 'terra3d.html')
       }
     }

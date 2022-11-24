@@ -108,20 +108,24 @@ navigator.geolocation.watchPosition(
 
 const autoCompleteJS = new autoComplete({
     placeHolder: "(Lat,Lon)",
+    threshold: 3,
+    searchEngine: "loose",
     data: {
     src: async (query) => {
-      try {
-            var arrCoord = query.split(",").map(Number);
-            if (arrCoord.length != 2) {
-                return [];
-            }
-
-            var arr = [query];
-            return arr;
-      } catch (error) {
-            return error;
-      }
-    }
+          try {
+                url: `${env.geocoder.proto}://${env.geocoder.host}:${env.geocoder.port}/geocode?q=${query}`;
+                const source = await fetch(url);
+                // Format data into JSON
+                const data = await source.json();
+                // Return Fetched data
+                console.log(JSON.stringify(data));
+                return data.results;
+          } catch (error) {
+                return error;
+          }
+        },
+        keys: ["formatted"],
+        cache: false
     },
     resultItem: {
         highlight: true
@@ -130,7 +134,8 @@ const autoCompleteJS = new autoComplete({
         input: {
             selection: (event) => {
                 const selection = event.detail.selection.value;
-                autoCompleteJS.input.value = selection;
+                autoCompleteJS.input.value = selection.formatted;
+                console.log("selected: " + JSON.stringify(selection));
                 
                 var feat = {
                     "type": "Feature",
@@ -138,9 +143,11 @@ const autoCompleteJS = new autoComplete({
                         "coordinates":[]},
                         "properties":{"name":""}
                 };
-                var arrCoord = selection.split(",").map(Number);
-                feat.geometry.coordinates = [arrCoord[1], arrCoord[0]];
-                feat.properties['name'] = selection;
+                var lat = selection.geometry.lat;
+                var lon = selection.geometry.lng;
+                feat.geometry.coordinates = [lon, lat];
+                feat.properties['name'] = selection.formatted;
+                console.log(JSON.stringify(feat));
                 loadPlace(feat);
             }
         }

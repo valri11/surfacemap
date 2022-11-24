@@ -107,7 +107,7 @@ navigator.geolocation.watchPosition(
 
 
 const autoCompleteJS = new autoComplete({
-    placeHolder: "(Lat,Lon)",
+    placeHolder: "Location...",
     threshold: 3,
     searchEngine: "loose",
     data: {

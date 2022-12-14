@@ -8,10 +8,13 @@ import * as hike from './bungonia_hike.json';
 
 var hikeCollection;
 
+var ovrName = 'hike123';
+var selectedPlaceName;
+
 if (!('name' in hike)) {
     // add name property - procedural-gl expects non-standard GeoJSON
     // object with property 'name'
-    hikeCollection = Object.assign({'name': 'hike'}, hike);
+    hikeCollection = Object.assign({'name': ovrName}, hike);
 
     hikeCollection.features[0].properties["color"] = "rgba(0, 200, 0, 0.5)";
     hikeCollection.features[0].properties["thickness"] = 4;
@@ -38,6 +41,7 @@ function loadPlace(feat) {
     placesListOverlay.classList.add( 'hidden' );
 
     Procedural.addOverlay( hikeCollection );
+    selectedPlaceName = name;
 }
 
 title.addEventListener( 'click', () => {
@@ -174,4 +178,8 @@ const autoCompleteJS = new autoComplete({
 
 Procedural.onOverlayAdded = function ( name ) {
   console.log( 'Overlay added:', name );
+  
+  if (places.features[0].properties.name != selectedPlaceName) {
+    setTimeout( () => Procedural.removeOverlay(ovrName), 500);
+  }
 }

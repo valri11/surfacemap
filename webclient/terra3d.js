@@ -4,6 +4,22 @@ import * as places from './terra3dplaces.json';
 import Procedural from 'procedural-gl';
 import autoComplete from '@tarekraafat/autocomplete.js';
 
+import * as hike from './bungonia_hike.json';
+
+var hikeCollection;
+
+if (!('name' in hike)) {
+    // add name property - procedural-gl expects non-standard GeoJSON
+    // object with property 'name'
+    hikeCollection = Object.assign({'name': 'hike'}, hike);
+
+    hikeCollection.features[0].properties["color"] = "rgba(0, 200, 0, 0.5)";
+    hikeCollection.features[0].properties["thickness"] = 4;
+
+} else {
+    hikeCollection = hike;
+}
+
 const placesList = document.getElementById('places-list');
 const placesListOverlay = document.getElementById('places-list-overlay');
 const title = document.getElementById('title');
@@ -20,6 +36,8 @@ function loadPlace(feat) {
     title.innerHTML = name;
     //subtitle.innerHTML = `${height}m`;
     placesListOverlay.classList.add( 'hidden' );
+
+    Procedural.addOverlay( hikeCollection );
 }
 
 title.addEventListener( 'click', () => {
@@ -153,3 +171,7 @@ const autoCompleteJS = new autoComplete({
         }
     }
 });
+
+Procedural.onOverlayAdded = function ( name ) {
+  console.log( 'Overlay added:', name );
+}

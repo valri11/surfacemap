@@ -6,6 +6,18 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
+        150.01731, -34.80123
+        ]
+      },
+      "properties": {
+        "name": "Bungonia"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
         150.3120553998699, -33.73196775624329
         ]
       },

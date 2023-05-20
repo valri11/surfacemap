@@ -29,7 +29,12 @@ import (
 	"github.com/paulmach/orb/maptile"
 	"github.com/paulmach/orb/simplify"
 	"github.com/spf13/cobra"
+	"github.com/valri11/go-servicepack/telemetry"
 	"github.com/valri11/surfacemap/slippymath"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/fogleman/contourmap"
 	"github.com/lucasb-eyer/go-colorful"
@@ -47,12 +52,15 @@ func init() {
 	rootCmd.AddCommand(webserverCmd)
 
 	webserverCmd.Flags().BoolP("dev-mode", "", false, "development mode (http on loclahost)")
+	webserverCmd.Flags().BoolP("enable-telemetry", "", false, "enable telemetry publishing")
+	webserverCmd.Flags().String("otel-collector", "localhost:4317", "open telemetry grpc collector")
 	webserverCmd.Flags().String("tls-cert", "", "TLS certificate file")
 	webserverCmd.Flags().String("tls-cert-key", "", "TLS certificate key file")
 	webserverCmd.Flags().Int("port", 8000, "service port to listen")
 }
 
 const (
+	serviceName = "surfacemap"
 	tilesBucket = "elevation-tiles-prod"
 	awsRegion   = "us-east-1"
 )
@@ -86,6 +94,7 @@ type terra struct {
 	cacheTileStore     *CacheTileStore
 	elevationTileStore *ElevationTileStore
 	gradientMap        *gradientMap
+	tracer             trace.Tracer
 }
 
 func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
@@ -140,6 +149,8 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 		return nil, err
 	}
 
+	tracer := otel.Tracer("surfacemap")
+
 	t := terra{
 		cfg:                cfg,
 		s3Config:           s3Config,
@@ -148,6 +159,7 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 		cacheTileStore:     cacheTileStore,
 		elevationTileStore: elevationTileStore,
 		gradientMap:        gm,
+		tracer:             tracer,
 	}
 	return &t, nil
 }
@@ -155,6 +167,16 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 func mainCmd(cmd *cobra.Command, args []string) {
 
 	devMode, err := cmd.Flags().GetBool("dev-mode")
+	if err != nil {
+		panic(err)
+	}
+
+	enableTelemetry, err := cmd.Flags().GetBool("enable-telemetry")
+	if err != nil {
+		panic(err)
+	}
+
+	otelEndpoint, err := cmd.Flags().GetString("otel-collector")
 	if err != nil {
 		panic(err)
 	}
@@ -188,17 +210,20 @@ func mainCmd(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
+	// instrument all aws clients
+	otelaws.AppendMiddlewares(&awsCfg.APIOptions)
+
 	t, err := NewTerra(awsCfg, s3Config{region: awsRegion, bucket: tilesBucket})
 	if err != nil {
 		panic(err)
 	}
 
 	r := mux.NewRouter()
-	r.HandleFunc("/terra/{z}/{x}/{y}.img", t.tilesHandler)
-	r.HandleFunc("/terra512/{z}/{x}/{y}.img", t.tiles512Handler)
-	r.HandleFunc("/terrain/{z}/{x}/{y}.img", t.tilesTerrainHandler)
-	r.HandleFunc("/contours/{z}/{x}/{y}.{format}", t.tilesContoursHandler)
-	r.HandleFunc("/color-relief/{z}/{x}/{y}.img", t.colorReliefHandler)
+	r.Handle("/terra/{z}/{x}/{y}.img", otelhttp.NewHandler(http.HandlerFunc(t.tilesHandler), "terra"))
+	r.Handle("/terra512/{z}/{x}/{y}.img", otelhttp.NewHandler(http.HandlerFunc(t.tiles512Handler), "terra512"))
+	r.Handle("/terrain/{z}/{x}/{y}.img", otelhttp.NewHandler(http.HandlerFunc(t.tilesTerrainHandler), "terrain"))
+	r.Handle("/contours/{z}/{x}/{y}.{format}", otelhttp.NewHandler(http.HandlerFunc(t.tilesContoursHandler), "contours"))
+	r.Handle("/color-relief/{z}/{x}/{y}.img", otelhttp.NewHandler(http.HandlerFunc(t.colorReliefHandler), "color-relief"))
 
 	// Where ORIGIN_ALLOWED is like `scheme://dns[:port]`, or `*` (insecure)
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "content-type", "username", "password", "Referer"})
@@ -215,6 +240,17 @@ func mainCmd(cmd *cobra.Command, args []string) {
 		WriteTimeout: 30 * time.Second,
 	}
 
+	shutdown, err := telemetry.InitProvider(ctx, enableTelemetry, serviceName, otelEndpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := shutdown(ctx); err != nil {
+			log.Fatal("failed to shutdown TracerProvider: %w", err)
+		}
+	}()
+
+	log.Printf("Listening on port: %d", servicePort)
 	if devMode {
 		err = srv.ListenAndServe()
 	} else {
@@ -385,6 +421,8 @@ func (h *terra) tiles512Handler(w http.ResponseWriter, r *http.Request) {
 
 func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	ctx, span := h.tracer.Start(ctx, "colorRelief")
+	defer span.End()
 
 	vars := mux.Vars(r)
 
@@ -413,8 +451,9 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dt1 := time.Now()
+	//dt1 := time.Now()
 
+	_, span2 := h.tracer.Start(ctx, "colorReliefImage")
 	img, _, err := image.Decode(bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -426,8 +465,9 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	dt2 := time.Now()
-	log.Printf("ColorRelief completed in %v", dt2.Sub(dt1))
+	span2.End()
+	//dt2 := time.Now()
+	//log.Printf("ColorRelief completed in %v", dt2.Sub(dt1))
 
 	buf = new(bytes.Buffer)
 	err = png.Encode(buf, imgOut)
@@ -451,6 +491,9 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	ctx, span := h.tracer.Start(ctx, "terrain")
+	defer span.End()
+
 	vars := mux.Vars(r)
 
 	log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
@@ -478,7 +521,8 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dt1 := time.Now()
+	//dt1 := time.Now()
+	_, span2 := h.tracer.Start(ctx, "hillShade")
 	pixel_res, err := slippymath.TilePixelResolution(uint32(z), float64(x), float64(y))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -512,8 +556,9 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 	if tr == "1" {
 		imgOut = TransparentGrayscale(imgOut)
 	}
-	dt2 := time.Now()
-	log.Printf("Hillshade completed in %v", dt2.Sub(dt1))
+	//dt2 := time.Now()
+	//log.Printf("Hillshade completed in %v", dt2.Sub(dt1))
+	span2.End()
 
 	buf = new(bytes.Buffer)
 	err = png.Encode(buf, imgOut)
@@ -536,6 +581,8 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	ctx, span := h.tracer.Start(ctx, "contours")
+	defer span.End()
 
 	vars, outFormat, interval, lvlInterval, zoom, tile_X, tile_Y, shouldReturn := h.getRequestContourParams(r, w)
 	if shouldReturn {
@@ -551,9 +598,10 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 
 	steps := [9][2]int{{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {0, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
 
-	dtStart := time.Now()
+	//dtStart := time.Now()
 
-	dt1 := time.Now()
+	//dt1 := time.Now()
+	_, span2 := h.tracer.Start(ctx, "decode-img")
 
 	data := make([]float64, 9*TileSize*TileSize)
 
@@ -604,8 +652,9 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	dt2 := time.Now()
-	log.Printf("decoded images %v\n", dt2.Sub(dt1))
+	//dt2 := time.Now()
+	//log.Printf("decoded images %v\n", dt2.Sub(dt1))
+	span2.End()
 
 	const off_px = 3
 
@@ -697,29 +746,31 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/vnd.mapbox-vector-tile")
 	}
 
-	dt2 = time.Now()
-	log.Printf("Contour completed in %v\n", dt2.Sub(dtStart))
+	//dt2 = time.Now()
+	//log.Printf("Contour completed in %v\n", dt2.Sub(dtStart))
 
 	w.Write(out)
 }
 
 func (h *terra) clearTileCache(ctx context.Context, zoom int, tile_X int, tile_Y int) {
-
 	h.cacheTileStore.ClearTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
 }
 
 func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (*bytes.Buffer, error) {
+	ctx, span := h.tracer.Start(ctx, "getTile")
+	defer span.End()
+
 	cacheData, err := h.cacheTileStore.GetTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
 
 	var tile *bytes.Buffer
-	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X, tile_Y)
-	dt1 := time.Now()
+	//oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X, tile_Y)
+	//dt1 := time.Now()
 
 	if err == nil {
 		tile = bytes.NewBuffer(cacheData)
 
-		dt2 := time.Now()
-		log.Printf("Cache hit: %s, read: %d in %v", oName, tile.Len(), dt2.Sub(dt1))
+		//dt2 := time.Now()
+		//log.Printf("Cache hit: %s, read: %d in %v", oName, tile.Len(), dt2.Sub(dt1))
 	} else if err == ErrTileNotFound {
 
 		s3Data, err := h.s3TileStore.GetTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
@@ -733,8 +784,8 @@ func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (
 		copy(cacheData, tile.Bytes())
 		h.cacheTileStore.Add(uint32(zoom), uint32(tile_X), uint32(tile_Y), cacheData)
 
-		dt2 := time.Now()
-		log.Printf("S3 GetObject: %s, read: %d in %v", oName, len(cacheData), dt2.Sub(dt1))
+		//dt2 := time.Now()
+		//log.Printf("S3 GetObject: %s, read: %d in %v", oName, len(cacheData), dt2.Sub(dt1))
 	} else {
 		return nil, err
 	}

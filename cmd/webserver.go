@@ -169,7 +169,11 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 
 func mainCmd(cmd *cobra.Command, args []string) {
 
-	logger := otelzap.New(zap.NewExample())
+	loggerZap, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	logger := otelzap.New(loggerZap, otelzap.WithMinLevel(zap.DebugLevel))
 	defer logger.Sync()
 
 	undo := otelzap.ReplaceGlobals(logger)

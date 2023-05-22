@@ -173,7 +173,9 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	if err != nil {
 		panic(err)
 	}
-	logger := otelzap.New(loggerZap, otelzap.WithMinLevel(zap.DebugLevel))
+	logger := otelzap.New(loggerZap,
+		otelzap.WithMinLevel(zap.DebugLevel),
+		otelzap.WithTraceIDField(true))
 	defer logger.Sync()
 
 	undo := otelzap.ReplaceGlobals(logger)
@@ -433,8 +435,7 @@ func (h *terra) tiles512Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	ctx, span := h.tracer.Start(ctx, "colorRelief")
+	ctx, span := h.tracer.Start(r.Context(), "colorRelief")
 	defer span.End()
 
 	vars := mux.Vars(r)

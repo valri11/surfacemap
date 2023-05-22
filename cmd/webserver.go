@@ -441,11 +441,11 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	//log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
-	traceId := span.SpanContext().TraceID().String()
-	spanId := span.SpanContext().SpanID().String()
-	logger := otelzap.Ctx(ctx).Logger().With(zap.String("trace-id", traceId)).With(zap.String("span-id", spanId))
+	//traceId := span.SpanContext().TraceID().String()
+	//spanId := span.SpanContext().SpanID().String()
+	//logger := otelzap.Ctx(ctx).Logger().With(zap.String("trace-id", traceId)).With(zap.String("span-id", spanId))
 
-	logger.Info(fmt.Sprintf("colorRelief. Tiles params: z=%v, x=%v, y=%v", vars["z"], vars["x"], vars["y"]))
+	otelzap.Ctx(ctx).Info(fmt.Sprintf("colorRelief. Tiles params: z=%v, x=%v, y=%v", vars["z"], vars["x"], vars["y"]))
 
 	z, err := strconv.Atoi(vars["z"])
 	if err != nil {

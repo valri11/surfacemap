@@ -38,6 +38,9 @@ import (
 
 	"github.com/fogleman/contourmap"
 	"github.com/lucasb-eyer/go-colorful"
+
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // webserverCmd represents the webserver command
@@ -166,6 +169,12 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 
 func mainCmd(cmd *cobra.Command, args []string) {
 
+	logger := otelzap.New(zap.NewExample())
+	defer logger.Sync()
+
+	undo := otelzap.ReplaceGlobals(logger)
+	defer undo()
+
 	devMode, err := cmd.Flags().GetBool("dev-mode")
 	if err != nil {
 		panic(err)
@@ -266,7 +275,7 @@ func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+	log.Printf("Tiles params: z=%v, x=%v, y=%v", vars["z"], vars["x"], vars["y"])
 
 	z, err := strconv.Atoi(vars["z"])
 	if err != nil {
@@ -426,7 +435,8 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+	//log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+	otelzap.Ctx(ctx).Info(fmt.Sprintf("colorRelief. Tiles params: z=%v, x=%v, y=%v", vars["z"], vars["x"], vars["y"]))
 
 	z, err := strconv.Atoi(vars["z"])
 	if err != nil {
@@ -496,7 +506,8 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+	//log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+	otelzap.Ctx(ctx).Info(fmt.Sprintf("terrain. Tiles params: z=%v, x=%v, y=%v", vars["z"], vars["x"], vars["y"]))
 
 	z, err := strconv.Atoi(vars["z"])
 	if err != nil {
@@ -589,8 +600,9 @@ func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Contours params: z=%v, x=%v, y=%v, interval=%s\n",
-		vars["z"], vars["x"], vars["y"], interval)
+	otelzap.Ctx(ctx).Info(fmt.Sprintf("Contours params: z=%v, x=%v, y=%v, interval=%s\n",
+		vars["z"], vars["x"], vars["y"], interval))
+	//log.Printf("Contours params: z=%v, x=%v, y=%v, interval=%s\n", vars["z"], vars["x"], vars["y"], interval)
 
 	oName := fmt.Sprintf("v2/terrarium/%d/%d/%d.png", zoom, tile_X, tile_Y)
 
@@ -797,8 +809,8 @@ func (h *terra) getElevationTile(ctx context.Context, zoom int, tile_X int, tile
 
 	elevData, err := h.elevationTileStore.GetTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
 	if err == nil {
-		dt2 := time.Now()
-		log.Printf("Cache hit: %d_%d_%d, read elevation data in %v", zoom, tile_X, tile_Y, dt2.Sub(dt1))
+		//dt2 := time.Now()
+		//log.Printf("Cache hit: %d_%d_%d, read elevation data in %v", zoom, tile_X, tile_Y, dt2.Sub(dt1))
 
 		return elevData, nil
 	} else if err != ErrTileNotFound {
@@ -841,7 +853,8 @@ func (h *terra) getElevationTile(ctx context.Context, zoom int, tile_X int, tile
 	h.elevationTileStore.Add(uint32(zoom), uint32(tile_X), uint32(tile_Y), data)
 
 	dt2 := time.Now()
-	log.Printf("Elevation tile: %d_%d_%d, decode elevation data in %v", zoom, tile_X, tile_Y, dt2.Sub(dt1))
+	otelzap.Ctx(ctx).Info(fmt.Sprintf("Elevation tile: %d_%d_%d, decode elevation data in %v", zoom, tile_X, tile_Y, dt2.Sub(dt1)))
+	//log.Printf("Elevation tile: %d_%d_%d, decode elevation data in %v", zoom, tile_X, tile_Y, dt2.Sub(dt1))
 
 	return data, nil
 }

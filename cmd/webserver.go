@@ -37,7 +37,10 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	metricsApi "go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/instrument"
 	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/fogleman/contourmap"
@@ -95,6 +98,7 @@ type s3Config struct {
 
 type appMetrics struct {
 	reqCounter            metricsApi.Int64Counter
+	reqDuration           metricsApi.Float64Histogram
 	reqTilesCounter       metricsApi.Int64Counter
 	reqContoursCounter    metricsApi.Int64Counter
 	reqColorReliefCounter metricsApi.Int64Counter
@@ -139,8 +143,19 @@ func NewAppMetrics(meter metricsApi.Meter) (*appMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	reqDuration, err := meter.Float64Histogram(
+		"req_duration",
+		instrument.WithDescription("Requests handler end to end duration"),
+		metricsApi.WithUnit("ms"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	m := appMetrics{
 		reqCounter:            reqCounter,
+		reqDuration:           reqDuration,
 		reqTilesCounter:       reqTilesCounter,
 		reqContoursCounter:    reqContoursCounter,
 		reqColorReliefCounter: reqColorReliefCounter,
@@ -208,7 +223,15 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 	if err != nil {
 		return nil, err
 	}
-	provider := metric.NewMeterProvider(metric.WithReader(exporter))
+
+	resources := resource.NewWithAttributes(
+		semconv.SchemaURL,
+		semconv.ServiceNameKey.String("surfacemap"),
+	)
+
+	provider := metric.NewMeterProvider(
+		metric.WithResource(resources),
+		metric.WithReader(exporter))
 
 	meter := provider.Meter("surfacemap")
 
@@ -501,6 +524,8 @@ func (h *terra) tiles512Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
+	requestStartTime := time.Now()
+
 	ctx, span := h.tracer.Start(r.Context(), "colorRelief")
 	defer span.End()
 
@@ -574,6 +599,9 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Expires", cacheUntil)
 
 	w.Write(out)
+
+	elapsedTime := float64(time.Since(requestStartTime)) / float64(time.Millisecond)
+	h.metrics.reqDuration.Record(ctx, elapsedTime)
 }
 
 func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {

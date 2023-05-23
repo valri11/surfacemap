@@ -526,7 +526,9 @@ func (h *terra) tiles512Handler(w http.ResponseWriter, r *http.Request) {
 func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 	requestStartTime := time.Now()
 
-	ctx, span := h.tracer.Start(r.Context(), "colorRelief")
+	ctx := NewContextWithTracer(r.Context(), h.tracer)
+
+	ctx, span := h.tracer.Start(ctx, "colorRelief")
 	defer span.End()
 
 	h.metrics.reqCounter.Add(ctx, 1)
@@ -605,7 +607,7 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx := NewContextWithTracer(r.Context(), h.tracer)
 
 	ctx, span := h.tracer.Start(ctx, "terrain")
 	defer span.End()
@@ -700,7 +702,8 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, span := h.tracer.Start(r.Context(), "contours")
+	ctx := NewContextWithTracer(r.Context(), h.tracer)
+	ctx, span := h.tracer.Start(ctx, "contours")
 	defer span.End()
 
 	h.metrics.reqCounter.Add(ctx, 1)

@@ -50,6 +50,11 @@ func (ts *S3TileStore) ClearTile(ctx context.Context, z uint32, x uint32, y uint
 
 func (ts *S3TileStore) GetTile(ctx context.Context, z uint32, x uint32, y uint32) ([]byte, error) {
 
+	tracer := TracerFromContext(ctx)
+
+	ctx, span := tracer.Start(ctx, "getTile")
+	defer span.End()
+
 	oName := fmt.Sprintf(ts.tileNameTempl, z, x, y)
 	goi := &s3.GetObjectInput{
 		Bucket: aws.String(ts.bucketName),
@@ -61,10 +66,13 @@ func (ts *S3TileStore) GetTile(ctx context.Context, z uint32, x uint32, y uint32
 		return nil, err
 	}
 
+	_, span2 := tracer.Start(ctx, "readTile")
+
 	data := new(bytes.Buffer)
 	data.ReadFrom(goo.Body)
-
 	goo.Body.Close()
+
+	span2.End()
 
 	return data.Bytes(), nil
 }

@@ -28,12 +28,16 @@ import (
 	"github.com/paulmach/orb/geojson"
 	"github.com/paulmach/orb/maptile"
 	"github.com/paulmach/orb/simplify"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"github.com/valri11/go-servicepack/telemetry"
 	"github.com/valri11/surfacemap/slippymath"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	metricsApi "go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/fogleman/contourmap"
@@ -89,6 +93,15 @@ type s3Config struct {
 	bucket string
 }
 
+type appMetrics struct {
+	reqCounter            metricsApi.Int64Counter
+	reqTilesCounter       metricsApi.Int64Counter
+	reqContoursCounter    metricsApi.Int64Counter
+	reqColorReliefCounter metricsApi.Int64Counter
+	cacheHitCounter       metricsApi.Int64Counter
+	s3TileCounter         metricsApi.Int64Counter
+}
+
 type terra struct {
 	cfg                aws.Config
 	s3Config           s3Config
@@ -98,6 +111,43 @@ type terra struct {
 	elevationTileStore *ElevationTileStore
 	gradientMap        *gradientMap
 	tracer             trace.Tracer
+	metrics            *appMetrics
+}
+
+func NewAppMetrics(meter metricsApi.Meter) (*appMetrics, error) {
+	reqCounter, err := meter.Int64Counter("req_cnt", metricsApi.WithDescription("request counter"))
+	if err != nil {
+		return nil, err
+	}
+	reqTilesCounter, err := meter.Int64Counter("tiles_cnt", metricsApi.WithDescription("tiles counter"))
+	if err != nil {
+		return nil, err
+	}
+	reqContoursCounter, err := meter.Int64Counter("contours_cnt", metricsApi.WithDescription("contours counter"))
+	if err != nil {
+		return nil, err
+	}
+	reqColorReliefCounter, err := meter.Int64Counter("color_relief_cnt", metricsApi.WithDescription("color relief counter"))
+	if err != nil {
+		return nil, err
+	}
+	cacheHitCounter, err := meter.Int64Counter("tiles_cache_hit_cnt", metricsApi.WithDescription("tiles cache hit counter"))
+	if err != nil {
+		return nil, err
+	}
+	s3TileCounter, err := meter.Int64Counter("tiles_s3_cnt", metricsApi.WithDescription("tiles s3 get counter"))
+	if err != nil {
+		return nil, err
+	}
+	m := appMetrics{
+		reqCounter:            reqCounter,
+		reqTilesCounter:       reqTilesCounter,
+		reqContoursCounter:    reqContoursCounter,
+		reqColorReliefCounter: reqColorReliefCounter,
+		cacheHitCounter:       cacheHitCounter,
+		s3TileCounter:         s3TileCounter,
+	}
+	return &m, nil
 }
 
 func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
@@ -154,6 +204,19 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 
 	tracer := otel.Tracer("surfacemap")
 
+	exporter, err := prometheus.New()
+	if err != nil {
+		return nil, err
+	}
+	provider := metric.NewMeterProvider(metric.WithReader(exporter))
+
+	meter := provider.Meter("surfacemap")
+
+	metrics, err := NewAppMetrics(meter)
+	if err != nil {
+		return nil, err
+	}
+
 	t := terra{
 		cfg:                cfg,
 		s3Config:           s3Config,
@@ -163,6 +226,7 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 		elevationTileStore: elevationTileStore,
 		gradientMap:        gm,
 		tracer:             tracer,
+		metrics:            metrics,
 	}
 	return &t, nil
 }
@@ -239,6 +303,8 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	r.Handle("/terrain/{z}/{x}/{y}.img", otelhttp.NewHandler(http.HandlerFunc(t.tilesTerrainHandler), "terrain"))
 	r.Handle("/contours/{z}/{x}/{y}.{format}", otelhttp.NewHandler(http.HandlerFunc(t.tilesContoursHandler), "contours"))
 	r.Handle("/color-relief/{z}/{x}/{y}.img", otelhttp.NewHandler(http.HandlerFunc(t.colorReliefHandler), "color-relief"))
+
+	r.Handle("/metrics", promhttp.Handler())
 
 	// Where ORIGIN_ALLOWED is like `scheme://dns[:port]`, or `*` (insecure)
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "content-type", "username", "password", "Referer"})
@@ -438,6 +504,9 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, span := h.tracer.Start(r.Context(), "colorRelief")
 	defer span.End()
 
+	h.metrics.reqCounter.Add(ctx, 1)
+	h.metrics.reqColorReliefCounter.Add(ctx, 1)
+
 	vars := mux.Vars(r)
 
 	//log.Printf("Tiles params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
@@ -512,6 +581,9 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx, span := h.tracer.Start(ctx, "terrain")
 	defer span.End()
+
+	h.metrics.reqCounter.Add(ctx, 1)
+	h.metrics.reqTilesCounter.Add(ctx, 1)
 
 	vars := mux.Vars(r)
 
@@ -600,9 +672,11 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	ctx, span := h.tracer.Start(ctx, "contours")
+	ctx, span := h.tracer.Start(r.Context(), "contours")
 	defer span.End()
+
+	h.metrics.reqCounter.Add(ctx, 1)
+	h.metrics.reqContoursCounter.Add(ctx, 1)
 
 	vars, outFormat, interval, lvlInterval, zoom, tile_X, tile_Y, shouldReturn := h.getRequestContourParams(r, w)
 	if shouldReturn {
@@ -792,6 +866,7 @@ func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (
 
 		//dt2 := time.Now()
 		//log.Printf("Cache hit: %s, read: %d in %v", oName, tile.Len(), dt2.Sub(dt1))
+		h.metrics.cacheHitCounter.Add(ctx, 1)
 	} else if err == ErrTileNotFound {
 
 		s3Data, err := h.s3TileStore.GetTile(ctx, uint32(zoom), uint32(tile_X), uint32(tile_Y))
@@ -804,6 +879,8 @@ func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (
 		cacheData := make([]byte, tile.Len())
 		copy(cacheData, tile.Bytes())
 		h.cacheTileStore.Add(uint32(zoom), uint32(tile_X), uint32(tile_Y), cacheData)
+
+		h.metrics.s3TileCounter.Add(ctx, 1)
 
 		//dt2 := time.Now()
 		//log.Printf("S3 GetObject: %s, read: %d in %v", oName, len(cacheData), dt2.Sub(dt1))

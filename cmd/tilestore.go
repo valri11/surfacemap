@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	lrucache "github.com/hashicorp/golang-lru"
+	"github.com/valri11/go-servicepack/telemetry"
 )
 
 var (
@@ -50,7 +51,7 @@ func (ts *S3TileStore) ClearTile(ctx context.Context, z uint32, x uint32, y uint
 
 func (ts *S3TileStore) GetTile(ctx context.Context, z uint32, x uint32, y uint32) ([]byte, error) {
 
-	tracer := TracerFromContext(ctx)
+	tracer := telemetry.TracerFromContext(ctx)
 
 	ctx, span := tracer.Start(ctx, "getTile")
 	defer span.End()

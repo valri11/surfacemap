@@ -37,10 +37,9 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	metricsApi "go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/instrument"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/fogleman/contourmap"
@@ -146,7 +145,7 @@ func NewAppMetrics(meter metricsApi.Meter) (*appMetrics, error) {
 
 	reqDuration, err := meter.Float64Histogram(
 		"req_duration",
-		instrument.WithDescription("Requests handler end to end duration"),
+		metricsApi.WithDescription("Requests handler end to end duration"),
 		metricsApi.WithUnit("ms"),
 	)
 	if err != nil {
@@ -526,7 +525,7 @@ func (h *terra) tiles512Handler(w http.ResponseWriter, r *http.Request) {
 func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 	requestStartTime := time.Now()
 
-	ctx := NewContextWithTracer(r.Context(), h.tracer)
+	ctx := telemetry.NewContextWithTracer(r.Context(), h.tracer)
 
 	ctx, span := h.tracer.Start(ctx, "colorRelief")
 	defer span.End()
@@ -607,7 +606,7 @@ func (h *terra) colorReliefHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := NewContextWithTracer(r.Context(), h.tracer)
+	ctx := telemetry.NewContextWithTracer(r.Context(), h.tracer)
 
 	ctx, span := h.tracer.Start(ctx, "terrain")
 	defer span.End()
@@ -702,7 +701,7 @@ func (h *terra) tilesTerrainHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *terra) tilesContoursHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := NewContextWithTracer(r.Context(), h.tracer)
+	ctx := telemetry.NewContextWithTracer(r.Context(), h.tracer)
 	ctx, span := h.tracer.Start(ctx, "contours")
 	defer span.End()
 

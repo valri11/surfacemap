@@ -902,11 +902,13 @@ func (h *terra) getTile(ctx context.Context, zoom int, tile_X int, tile_Y int) (
 			return nil, err
 		}
 
+		_, span2 := h.tracer.Start(ctx, "cacheTileStore")
 		tile = bytes.NewBuffer(s3Data)
 
 		cacheData := make([]byte, tile.Len())
 		copy(cacheData, tile.Bytes())
 		h.cacheTileStore.Add(uint32(zoom), uint32(tile_X), uint32(tile_Y), cacheData)
+		span2.End()
 
 		h.metrics.s3TileCounter.Add(ctx, 1)
 

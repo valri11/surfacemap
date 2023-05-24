@@ -402,7 +402,12 @@ func (h *terra) tilesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *terra) tiles512Handler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx := telemetry.NewContextWithTracer(r.Context(), h.tracer)
+
+	ctx, span := h.tracer.Start(ctx, "tiles512")
+	defer span.End()
+
+	h.metrics.reqCounter.Add(ctx, 1)
 
 	vars := mux.Vars(r)
 

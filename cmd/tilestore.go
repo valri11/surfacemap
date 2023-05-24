@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	lrucache "github.com/hashicorp/golang-lru"
 	"github.com/valri11/go-servicepack/telemetry"
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -51,7 +52,10 @@ func (ts *S3TileStore) ClearTile(ctx context.Context, z uint32, x uint32, y uint
 
 func (ts *S3TileStore) GetTile(ctx context.Context, z uint32, x uint32, y uint32) ([]byte, error) {
 
-	tracer := telemetry.TracerFromContext(ctx)
+	tracer, ok := telemetry.TracerFromContext(ctx)
+	if !ok {
+		tracer = otel.Tracer("surfacemap")
+	}
 
 	ctx, span := tracer.Start(ctx, "getTile")
 	defer span.End()

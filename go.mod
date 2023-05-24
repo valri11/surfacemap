@@ -17,7 +17,7 @@ require (
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.3
 	github.com/uptrace/opentelemetry-go-extra/otelzap v0.2.0
-	github.com/valri11/go-servicepack v0.0.0-20230523212424-d0182d60db12
+	github.com/valri11/go-servicepack v0.0.0-20230524205153-990d1705fdb1
 	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws v0.42.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0
 	go.opentelemetry.io/otel v1.16.0

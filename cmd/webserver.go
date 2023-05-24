@@ -30,6 +30,7 @@ import (
 	"github.com/paulmach/orb/simplify"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
+	"github.com/valri11/go-servicepack/logger"
 	"github.com/valri11/go-servicepack/telemetry"
 	"github.com/valri11/surfacemap/slippymath"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
@@ -255,10 +256,11 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 
 func mainCmd(cmd *cobra.Command, args []string) {
 
-	loggerZap, err := zap.NewProduction()
+	loggerZap, err := logger.New(zap.DebugLevel, true)
 	if err != nil {
 		panic(err)
 	}
+
 	logger := otelzap.New(loggerZap,
 		otelzap.WithMinLevel(zap.DebugLevel),
 		otelzap.WithTraceIDField(true))
@@ -411,7 +413,8 @@ func (h *terra) tiles512Handler(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	log.Printf("Tiles512 params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+	//log.Printf("Tiles512 params: z=%v, x=%v, y=%v\n", vars["z"], vars["x"], vars["y"])
+	otelzap.Ctx(ctx).Info(fmt.Sprintf("Tiles512 params: z=%v, x=%v, y=%v", vars["z"], vars["x"], vars["y"]))
 
 	z, err := strconv.Atoi(vars["z"])
 	if err != nil {

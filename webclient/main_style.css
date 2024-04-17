@@ -35,3 +35,67 @@ table.controls td:nth-child(3) {
   left: .5em;
 }
 
+#autoComplete {
+    top: 20px;
+    left: 80px;
+    border: 1px solid white;
+    background-color: rgba(0,60,136,0.5);
+    background-size: 1rem;
+    background-position: left 0.65rem top 0.6rem;
+    caret-color: white;
+    padding: 0 0 0 2.1rem;
+    height: 2.1rem;
+    width: 0;
+}
+
+#autoComplete:hover {
+    color: white;
+    background-size: 1rem;
+    background-position: left 0.65rem top 0.6rem;
+    padding: 0 0 0 2.1rem;
+    height: 2.1rem;
+    width: 20rem;
+}
+
+#autoComplete:focus {
+    background-size: 1rem;
+    background-position: left 0.65rem top 0.6rem;
+    padding: 0 0 0 2.1rem;
+    height: 2.1rem;
+    width: 20rem;
+    border: 1px solid white;
+    color: white;
+    box-shadow: rgba(255, 255, 255, 0.3) 0px 0px 3px 3px;
+}
+
+#autoComplete::placeholder {
+    color: rgba(255, 255, 255, 0);
+}
+
+#autoComplete:hover::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#autoComplete:focus::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#autoComplete_list {
+    margin: 0;
+    left: 11px;
+    top: 55px;
+}
+
+.autoComplete_result {
+    margin: 0;
+    border: 1px solid #e3e3e3;
+}
+
+.autoComplete_result:hover {
+    border-top: 1px solid transparent;
+    border-bottom: 1px solid transparent;
+}
+
+.autoComplete_result:last-child {
+    border-radius: inherit;
+}

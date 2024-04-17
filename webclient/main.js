@@ -18,6 +18,7 @@ import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import {circular} from 'ol/geom/Polygon';
 import Control from 'ol/control/Control';
+import autoComplete from '@tarekraafat/autocomplete.js';
 
 // POI
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
@@ -37,7 +38,7 @@ const challengerDeep = fromLonLat([142.592522558379, 11.393434778584895])
 
 // hillshade images
 const sourceTerrain = new XYZ({
-  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/terrain/{z}/{x}/{y}.img?transp=1`,
+  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/surfacemap/terrain/{z}/{x}/{y}.img?transp=1`,
   crossOrigin: 'anonymous',
   tileGrid: createXYZ({
     minZoom: 3,
@@ -51,7 +52,7 @@ const locationLayer = new VectorLayer({
 });
 
 const sourceColorRelief = new XYZ({
-  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/color-relief/{z}/{x}/{y}.img`,
+  url: `${env.contours.proto}://${env.contours.host}:${env.contours.port}/surfacemap/color-relief/{z}/{x}/{y}.img`,
   crossOrigin: 'anonymous',
   tileGrid: createXYZ({
     minZoom: 3,
@@ -117,7 +118,7 @@ const lineStyle = new Style({
 const style = [lineStyle, labelStyle];
 
 function getContoursUrl(interval) {
-    return `${env.contours.proto}://${env.contours.host}:${env.contours.port}/contours/{z}/{x}/{y}.mvt?interval=${interval}`;
+    return `${env.contours.proto}://${env.contours.host}:${env.contours.port}/surfacemap/contours/{z}/{x}/{y}.mvt?interval=${interval}`;
 }
 
 const contoursLayer = new VectorTileLayer({
@@ -382,3 +383,67 @@ map.addControl(
 );
 
 sync(map);
+
+function loadPlace(feat) {
+    console.log(JSON.stringify(feat))
+
+    const [longitude, latitude] = feat.geometry.coordinates;
+    const location = fromLonLat([longitude, latitude]);
+    view.setCenter(location);
+}
+
+const autoCompleteJS = new autoComplete({
+    placeHolder: "Location...",
+    threshold: 3,
+    searchEngine: "loose",
+    data: {
+    src: async (query) => {
+          try {
+                var url = `${env.geocoder.proto}://${env.geocoder.host}:${env.geocoder.port}/geocodeproxy/geocode?q=${query}`;
+                const source = await fetch(
+                    url,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'X-Authorization': `Apikey ${env.geocoder.apikey}`,
+                        },
+                    }
+                );
+                // Format data into JSON
+                const data = await source.json();
+                // Return Fetched data
+                console.log(JSON.stringify(data));
+                return data.results;
+          } catch (error) {
+                return error;
+          }
+        },
+        keys: ["formatted"],
+        cache: false
+    },
+    resultItem: {
+        highlight: true
+    },
+    events: {
+        input: {
+            selection: (event) => {
+                const selection = event.detail.selection.value;
+                autoCompleteJS.input.value = selection.formatted;
+                console.log("selected: " + JSON.stringify(selection));
+                
+                var feat = {
+                    "type": "Feature",
+                    "geometry": {"type":"Point", 
+                        "coordinates":[]},
+                        "properties":{"name":""}
+                };
+                var lat = selection.geometry.lat;
+                var lon = selection.geometry.lng;
+                feat.geometry.coordinates = [lon, lat];
+                feat.properties['name'] = selection.formatted;
+                console.log(JSON.stringify(feat));
+                loadPlace(feat);
+            }
+        }
+    }
+});

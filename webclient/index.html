@@ -10,10 +10,17 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Surface Map</title>
+  <link rel="stylesheet" href="./main_style.css">
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/css/autoComplete.min.css">
 </head>
 
 <body>
-  <div id="map" class="map"></div>
+  <div id="map" class="map">
+  </div>
+  <div class="autoComplete_wrapper" style="position: absolute; left: 60px;top: 10px;width: 600px;">
+    <input id="autoComplete" type="search" dir="ltr" spellcheck=false autocorrect="off" autocomplete="off" autocapitalize="off">
+  </div>
   <div class="footer">
     <input type="checkbox" id="checkbox-debug" name="checkbox-debug">
     <label for="checkbox-debug">Show debug layer</label>

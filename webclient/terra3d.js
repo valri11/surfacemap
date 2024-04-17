@@ -4,7 +4,8 @@ import * as places from './terra3dplaces.json';
 import Procedural from 'procedural-gl';
 import autoComplete from '@tarekraafat/autocomplete.js';
 
-import * as hike from './bungonia_hike.json';
+//import * as hike from './bungonia_hike.json';
+import * as hike from './six-foot-track-dec23.json';
 
 var hikeCollection;
 
@@ -71,7 +72,7 @@ if (basemap != basemap_default) {
     }
 }
 
-const container = document.getElementById( 'map' );
+const container = document.getElementById('map');
     
 // Custom datasource definition
 var datasource = {
@@ -112,22 +113,6 @@ if (places.features.length > 0) {
     loadPlace(places.features[0]);
 }
 
-navigator.geolocation.watchPosition(
-  function (pos) {
-    const coords = [pos.coords.longitude, pos.coords.latitude];
-    //const accuracy = circular(coords, pos.coords.accuracy);
-    Procedural.setUserLocation(pos);
-    //title.innerHTML = `${coords[0]}, ${coords[1]}`;
-  },
-  function (error) {
-    alert(`ERROR: ${error.message}`);
-  },
-  {
-    enableHighAccuracy: true,
-  }
-);
-
-
 const autoCompleteJS = new autoComplete({
     placeHolder: "Location...",
     threshold: 3,
@@ -135,8 +120,16 @@ const autoCompleteJS = new autoComplete({
     data: {
     src: async (query) => {
           try {
-                var url = `${env.geocoder.proto}://${env.geocoder.host}:${env.geocoder.port}/geocode?q=${query}`;
-                const source = await fetch(url);
+                var url = `${env.geocoder.proto}://${env.geocoder.host}:${env.geocoder.port}/geocodeproxy/geocode?q=${query}`;
+                const source = await fetch(
+                    url,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'X-Authorization': `Apikey ${env.geocoder.apikey}`,
+                        },
+                    }
+                );
                 // Format data into JSON
                 const data = await source.json();
                 // Return Fetched data

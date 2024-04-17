@@ -217,7 +217,7 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 		return nil, err
 	}
 
-	tracer := otel.Tracer("surfacemap")
+	tracer := otel.Tracer(serviceName)
 
 	exporter, err := prometheus.New()
 	if err != nil {
@@ -226,14 +226,14 @@ func NewTerra(cfg aws.Config, s3Config s3Config) (*terra, error) {
 
 	resources := resource.NewWithAttributes(
 		semconv.SchemaURL,
-		semconv.ServiceNameKey.String("surfacemap"),
+		semconv.ServiceNameKey.String(serviceName),
 	)
 
 	provider := metric.NewMeterProvider(
 		metric.WithResource(resources),
 		metric.WithReader(exporter))
 
-	meter := provider.Meter("surfacemap")
+	meter := provider.Meter(serviceName)
 
 	metrics, err := NewAppMetrics(meter)
 	if err != nil {

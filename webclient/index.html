@@ -16,10 +16,16 @@
 </head>
 
 <body>
+  <h1 id="title"></h1>
   <div id="map" class="map">
   </div>
   <div class="autoComplete_wrapper" style="position: absolute; left: 60px;top: 10px;width: 600px;">
     <input id="autoComplete" type="search" dir="ltr" spellcheck=false autocorrect="off" autocomplete="off" autocapitalize="off">
+  </div>
+  <div id="places-list-overlay">
+    <h2>Surface Map</h2>
+    <h1>Choose a place to visit</h1>
+    <ul id="places-list"></ul>
   </div>
   <div class="footer">
     <input type="checkbox" id="checkbox-debug" name="checkbox-debug">
@@ -58,7 +64,9 @@
     <div id="popup-content"></div>
   </div>
   <div id="mouse-position"></div>
+
   <script type="module" src="./main.js"></script>
+
 </body>
 
 </html>

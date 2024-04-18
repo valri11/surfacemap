@@ -1,3 +1,4 @@
+import './main_style.css';
 import * as env from './env.json';
 import Map from 'ol/Map';
 import View from 'ol/View';
@@ -21,10 +22,50 @@ import autoComplete from '@tarekraafat/autocomplete.js';
 
 import 'ol/ol.css';
 import 'ol-ext/dist/ol-ext.css';
-import './main_style.css';
+import './ctrls-over.css';
 
 import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import GeoBookmark from 'ol-ext/control/GeoBookmark';
+
+import * as places from './main_places.json';
+
+const placesList = document.getElementById('places-list');
+const placesListOverlay = document.getElementById('places-list-overlay');
+const title = document.getElementById('title');
+//const subtitle = document.getElementById('subtitle');
+
+//console.log(JSON.stringify(places.features))
+var selectedPlaceName;
+
+function loadPlace(feat) {
+    console.log(JSON.stringify(feat))
+
+    const { name } = feat.properties;
+    const [longitude, latitude] = feat.geometry.coordinates;
+    const location = fromLonLat([longitude, latitude]);
+    view.setCenter(location);
+    placesListOverlay.classList.add( 'hidden' );
+
+    title.innerHTML = name;
+    selectedPlaceName = name;
+}
+
+title.addEventListener( 'click', () => {
+    placesListOverlay.classList.remove( 'hidden' );
+} );
+
+places.features.map((feat, i) => {
+    console.log(JSON.stringify(feat))
+    const li = document.createElement( 'li' );
+    let p = document.createElement( 'p' );
+    p.innerHTML = feat.properties.name;
+    li.appendChild( p );
+    p = document.createElement( 'p' );
+    //p.innerHTML = i + 1;
+    li.appendChild( p );
+    placesList.appendChild( li );
+    li.addEventListener( 'click', () => loadPlace(feat));
+});
 
 // POI
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
@@ -167,6 +208,11 @@ const map = new Map({
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
 });
+
+if (places.features.length > 0) {
+    loadPlace(places.features[0]);
+}
+
 
 function onClick(id, callback) {
   document.getElementById(id).addEventListener('click', callback);
@@ -418,13 +464,13 @@ map.addControl(bm);
 
 sync(map);
 
-function loadPlace(feat) {
-    console.log(JSON.stringify(feat))
-
-    const [longitude, latitude] = feat.geometry.coordinates;
-    const location = fromLonLat([longitude, latitude]);
-    view.setCenter(location);
-}
+//function loadPlace(feat) {
+//    console.log(JSON.stringify(feat))
+//
+//    const [longitude, latitude] = feat.geometry.coordinates;
+//    const location = fromLonLat([longitude, latitude]);
+//    view.setCenter(location);
+//}
 
 const autoCompleteJS = new autoComplete({
     placeHolder: "Location...",

@@ -1,0 +1,13 @@
+@import 'node_modules/ol/ol.css';
+@import 'ol-ext/dist/ol-ext.css';
+
+.ol-control.ol-bookmark {
+    top: 7em;
+    left: 0.5em;
+    background-color: rgba(0, 60, 136, .5);
+}
+
+.ol-control.ol-layerswitcher {
+    background-color: rgba(0, 60, 136, .5);
+}
+

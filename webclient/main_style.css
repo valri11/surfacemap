@@ -118,10 +118,10 @@ h2 {
 }
 
 #title {
-  background: #232e32;
+  background: #3c8880;
   padding: 6px 12px 18px 12px;
   bottom: 0.5em;
-  right: 1em;
+  left: 0.5em;
   cursor: pointer;
 }
 
@@ -180,7 +180,7 @@ h2 {
 
 #places-list p {
   display: inline;
-  line-height: 120px;
+  line-height: 40px;
   font-size: 20px;
   font-weight: 100;
   background: #232e32;

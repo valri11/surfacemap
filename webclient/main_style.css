@@ -99,3 +99,10 @@ table.controls td:nth-child(3) {
 .autoComplete_result:last-child {
     border-radius: inherit;
 }
+
+.ol-control.ol-bookmark {
+    top: 7em;
+    left: 0.5em;
+    background-color: rgba(255, 255, 255, .5);
+}
+

@@ -1,4 +1,3 @@
-import './main_style.css';
 import * as env from './env.json';
 import Map from 'ol/Map';
 import View from 'ol/View';
@@ -6,7 +5,7 @@ import {Tile as TileLayer, VectorTile as VectorTileLayer, Image as ImageLayer} f
 import {TileDebug, OSM, XYZ, VectorTile, Raster} from 'ol/source';
 import {GeoJSON, MVT} from 'ol/format';
 import {createStringXY} from 'ol/coordinate';
-import {fromLonLat, getPointResolution} from 'ol/proj';
+import {fromLonLat, getPointResolution, transform} from 'ol/proj';
 import Overlay from 'ol/Overlay';
 import {Fill, Stroke, Style, Text} from 'ol/style';
 import {createXYZ} from 'ol/tilegrid';
@@ -19,6 +18,13 @@ import Point from 'ol/geom/Point';
 import {circular} from 'ol/geom/Polygon';
 import Control from 'ol/control/Control';
 import autoComplete from '@tarekraafat/autocomplete.js';
+
+import 'ol/ol.css';
+import 'ol-ext/dist/ol-ext.css';
+import './main_style.css';
+
+import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
+import GeoBookmark from 'ol-ext/control/GeoBookmark';
 
 // POI
 const kyrg = fromLonLat([74.57950579031711, 42.51248314829303])
@@ -61,26 +67,30 @@ const sourceColorRelief = new XYZ({
 });
 
 const debugLayer = new TileLayer({
-    source: new TileDebug({
+  source: new TileDebug({
         projection: 'EPSG:3857',
         tileGrid: createXYZ({
         maxZoom: 21
         })
-  })
+  }),
+  title: 'debug'
 });
 
 const hillshadeLayer = new TileLayer({
   source: sourceTerrain,
   opacity: 0.3,
+  title: 'hillshade'
 });
 
 const basemapLayer = new TileLayer({
-    source: new OSM()
+    source: new OSM(),
+    title: 'Base map'
 });
 
 const colormapLayer = new TileLayer({
   source: sourceColorRelief,
   opacity: 0.8,
+  title: 'colormap'
 });
 
 
@@ -122,6 +132,7 @@ function getContoursUrl(interval) {
 }
 
 const contoursLayer = new VectorTileLayer({
+  title: 'contours',
   source: new VectorTile({
     url: getContoursUrl(ctrInterval),
     format: new MVT(),
@@ -151,7 +162,7 @@ const map = new Map({
     hillshadeLayer,
     contoursLayer,
     debugLayer,
-    locationLayer,
+    //locationLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
@@ -381,6 +392,29 @@ map.addControl(
     element: locate,
   })
 );
+
+var ctrlLayerSwitch = new LayerSwitcher({
+    // collapsed: false,
+    // mouseover: true
+});
+map.addControl(ctrlLayerSwitch);
+ctrlLayerSwitch.on('toggle', function(e) {
+    console.log('Collapse layerswitcher', e.collapsed);
+});
+
+var bm = new GeoBookmark({
+    editable: false,
+    marks: {
+      KG: {pos: transform([74.57950579031711, 42.51248314829303], 'EPSG:4326', 'EPSG:3857'), zoom:11, permanent: true },
+      'Khan Tengri': {pos: transform([80.17411914133028, 42.213405765504476], 'EPSG:4326', 'EPSG:3857'), zoom:11, permanent: true },
+      Katoomba: {pos: transform([150.3120553998699, -33.73196775624329], 'EPSG:4326', 'EPSG:3857'), zoom:13, permanent: true },
+      Uluru: {pos: transform([131.03388514743847, -25.34584297139171], 'EPSG:4326', 'EPSG:3857'), zoom:12, permanent: true },
+      'Mt Denali': {pos: transform([-151.00726915968875,63.069268194834244], 'EPSG:4326', 'EPSG:3857'), zoom:12, permanent: true },
+      'Pik Pobedy': {pos: transform([80.129257551509, 42.03767896555761], 'EPSG:4326', 'EPSG:3857'), zoom:12 },
+      'Mt Everest': {pos: transform([86.9251465845193, 27.98955908635046], 'EPSG:4326', 'EPSG:3857'), zoom:14 },
+    }
+});
+map.addControl(bm);
 
 sync(map);
 

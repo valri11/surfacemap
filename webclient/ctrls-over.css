@@ -2,7 +2,7 @@
 @import 'ol-ext/dist/ol-ext.css';
 
 .ol-control.ol-bookmark {
-    top: 7em;
+    top: 7.5em;
     left: 0.5em;
     background-color: rgba(0, 60, 136, .5);
 }
@@ -11,3 +11,14 @@
     background-color: rgba(0, 60, 136, .5);
 }
 
+.ol-control.ol-profile {
+    top: unset;
+    bottom: 1.5em;
+    right: 0.5em;
+    background-color: rgba(0, 60, 136, .5);
+}
+
+.terra3d-btn {
+    top: 6em;
+    right: 0.5em;
+}

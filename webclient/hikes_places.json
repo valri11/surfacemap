@@ -1,0 +1,213 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        150.01731,-34.80123
+        ]
+      },
+      "properties": {
+        "name": "Bungonia - 2022-12-11",
+        "data": "./hikes_data/bungonia_hike.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.177384424,-33.5905378
+        ]
+      },
+      "properties": {
+        "name": "Brooklyn - 2023-01-02",
+        "data": "./hikes_data/brooklyn_02Jan2023.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.4376141037792,-33.47027728334069
+        ]
+      },
+      "properties": {
+        "name": "Avoca - 2023-01-28",
+        "data": "./hikes_data/avoca_28Jan2023.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.13372057676315,-33.652181178331375
+        ]
+      },
+      "properties": {
+        "name": "Mt Kuring-Gai - 2023-02-18",
+        "data": "./hikes_data/mtkuringgai_18Feb2023.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.0693408548832,-33.56256597675383
+        ]
+      },
+      "properties": {
+        "name": "Fiddletown - 2023-04-08",
+        "data": "./hikes_data/fiddletown_08Apr2023.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.25575304031372,-33.48930722102523
+        ]
+      },
+      "properties": {
+        "name": "Wondabyne - 2023-05-27",
+        "data": "./hikes_data/Wondabyne_20230527.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.13363575190306,-33.77362565137446
+        ]
+      },
+      "properties": {
+        "name": "Macquarie Park - 2023-06-24",
+        "data": "./hikes_data/MacquariePark_20230624.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.648767, -33.105596
+        ]
+      },
+      "properties": {
+        "name": "Caves beach - 2023-08-05",
+        "data": "./hikes_data/caves_beach_05Aug2023.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.09206947498024,-33.68818438611925
+        ]
+      },
+      "properties": {
+        "name": "Asquith to Galston Gorge - 2023-09-16",
+        "data": "./hikes_data/AsquithGalstonGorge_20230916.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.2560495082289,-33.49140990525484
+        ]
+      },
+      "properties": {
+        "name": "Wondabyne to Wobby Wharf - 2023-11-18",
+        "data": "./hikes_data/Wondabyne2WobbyWharf_20231118.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        150.9869238641113,-33.38019160553813
+        ]
+      },
+      "properties": {
+        "name": "Wisemans Ferry - 2024-01-03",
+        "data": "./hikes_data/WisemansFerry_20240103.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.08978590928018,-33.32740397192538
+        ]
+      },
+      "properties": {
+        "name": "Ten Mile Hollow - 2024-01-04",
+        "data": "./hikes_data/TenMileHollow_20240104.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.12382221966982,-33.678836887702346
+        ]
+      },
+      "properties": {
+        "name": "Mount Colah - 2024-03-09",
+        "data": "./hikes_data/MountColah_20240309.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.00762599147856,-33.748621344566345
+        ]
+      },
+      "properties": {
+        "name": "Castle Hill - 2024-04-01",
+        "data": "./hikes_data/CastleHill_20240401.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.29640619270504,-33.75449228100479
+        ]
+      },
+      "properties": {
+        "name": "Sun Run - 2024-02-03",
+        "data": "./hikes_data/SunRun_20240203.geojson"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        151.21256846934557,-33.87389341369271
+        ]
+      },
+      "properties": {
+        "name": "City2Surf - 2023-08-13",
+        "data": "./hikes_data/City2Surf_20230813.geojson"
+      }
+    }
+  ]
+}

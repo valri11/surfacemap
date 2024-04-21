@@ -138,7 +138,7 @@ h2 {
 
 @media (min-width: 400px) { 
 #places-list-overlay {
-  width: 400px;
+  width: 450px;
   top: 1em;
 }
 }

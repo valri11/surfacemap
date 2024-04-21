@@ -1,47 +1,52 @@
-import './terra3d.css';
+import './hikes3d.css';
 import * as env from './env.json';
-import * as places from './terra3dplaces.json';
+import * as places from './hikes_places.json';
 import Procedural from 'procedural-gl';
 import autoComplete from '@tarekraafat/autocomplete.js';
-
-//import * as hike from './bungonia_hike.json';
-import * as hike from './six-foot-track-dec23.json';
-
-var hikeCollection;
 
 var ovrName = 'hike123';
 var selectedPlaceName;
 
-if (!('name' in hike)) {
-    // add name property - procedural-gl expects non-standard GeoJSON
-    // object with property 'name'
-    hikeCollection = Object.assign({'name': ovrName}, hike);
+var hikeCollection;
 
-    hikeCollection.features[0].properties["color"] = "rgba(0, 200, 0, 0.5)";
-    hikeCollection.features[0].properties["thickness"] = 6;
-} else {
-    hikeCollection = hike;
+function loadJsonDoc(url) {
+    fetch(url)
+    .then(res => res.json())
+    .then(out => {
+        console.log('Checkout this JSON! ', out);
+        var fc = out;
+        if (!('name' in fc)) {
+            // add name property - procedural-gl expects non-standard GeoJSON
+            // object with property 'name'
+            hikeCollection = Object.assign({'name': ovrName}, fc);
+
+            hikeCollection.features[0].properties["color"] = "rgba(0, 200, 0, 0.5)";
+            hikeCollection.features[0].properties["thickness"] = 6;
+        } else {
+            hikeCollection = fc;
+        }
+        
+        Procedural.addOverlay( hikeCollection );
+        //selectedPlaceName = name;
+    })
+    .catch(err => { throw err });
 }
 
 const placesList = document.getElementById('places-list');
 const placesListOverlay = document.getElementById('places-list-overlay');
 const title = document.getElementById('title');
-//const subtitle = document.getElementById('subtitle');
-
-//console.log(JSON.stringify(places.features))
 
 function loadPlace(feat) {
     console.log(JSON.stringify(feat))
 
-    const { name } = feat.properties;
+    const { name, data } = feat.properties;
     const [longitude, latitude] = feat.geometry.coordinates;
     Procedural.displayLocation( { latitude, longitude } );
     title.innerHTML = name;
     //subtitle.innerHTML = `${height}m`;
     placesListOverlay.classList.add( 'hidden' );
 
-    Procedural.addOverlay( hikeCollection );
-    selectedPlaceName = name;
+    loadJsonDoc(data);
 }
 
 title.addEventListener( 'click', () => {
@@ -171,7 +176,7 @@ const autoCompleteJS = new autoComplete({
 Procedural.onOverlayAdded = function ( name ) {
   console.log( 'Overlay added:', name );
   
-  if (places.features[0].properties.name != selectedPlaceName) {
-    setTimeout( () => Procedural.removeOverlay(ovrName), 500);
-  }
+//  if (places.features[0].properties.name != selectedPlaceName) {
+//    setTimeout( () => Procedural.removeOverlay(ovrName), 500);
+//  }
 }

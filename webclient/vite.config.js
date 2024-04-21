@@ -10,7 +10,8 @@ module.exports = defineConfig({
         main: resolve(__dirname, 'index.html'),
         sealevel: resolve(__dirname, 'sealevel.html'),
         terra3d: resolve(__dirname, 'terra3d.html'),
-        hikes: resolve(__dirname, 'hikes.html')
+        hikes: resolve(__dirname, 'hikes.html'),
+        hikes3d: resolve(__dirname, 'hikes3d.html')
       }
     }
   }

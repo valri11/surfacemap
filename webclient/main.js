@@ -4,11 +4,11 @@ import Map from 'ol/Map';
 import View from 'ol/View';
 import {Tile as TileLayer, VectorTile as VectorTileLayer, Image as ImageLayer} from 'ol/layer';
 import {TileDebug, OSM, XYZ, VectorTile, Raster} from 'ol/source';
-import {GeoJSON, MVT} from 'ol/format';
+import {GeoJSON, GPX, MVT} from 'ol/format';
 import {createStringXY} from 'ol/coordinate';
 import {fromLonLat, getPointResolution, transform} from 'ol/proj';
 import Overlay from 'ol/Overlay';
-import {Fill, Stroke, Style, Text} from 'ol/style';
+import {Fill, Stroke, Circle, Style, Text} from 'ol/style';
 import {createXYZ} from 'ol/tilegrid';
 import {Attribution, MousePosition, defaults as defaultControls} from 'ol/control';
 import sync from 'ol-hashed';
@@ -26,8 +26,13 @@ import './ctrls-over.css';
 
 import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import GeoBookmark from 'ol-ext/control/GeoBookmark';
+import Button from 'ol-ext/control/Button';
+import Profile from 'ol-ext/control/Profile';
+import Hover from 'ol-ext/interaction/Hover';
 
 import * as places from './main_places.json';
+
+import * as hike from './six-foot-track-dec23.json';
 
 const placesList = document.getElementById('places-list');
 const placesListOverlay = document.getElementById('places-list-overlay');
@@ -75,6 +80,71 @@ const sourceTerrain = new XYZ({
     minZoom: 3,
     maxZoom: 15
   }),
+});
+
+var hikeSource = new VectorSource({
+    url: './six_foot_track.json',
+    format: new GeoJSON(),
+
+    //url: './mount-colah-to-bobbin-head-loop-via-the-sphinx.gpx',
+    //url: './avoca-to-putty-beach.gpx',
+    //url: './Wondabyne_27May2023.gpx',
+    //url: './CavesBeach_05Aug2023.gpx',
+    //url: './bungonia_hike.gpx',
+    //url: './Six foot track.gpx',
+    //url: './six-foot-track-dec23.gpx',
+    //format: new GPX(),
+});
+
+var hikeLayer = new VectorLayer({
+    title: 'hikes',
+    source: hikeSource,
+    style: new Style({
+        fill: new Fill({
+            color: 'rgba(255, 255, 255, 0.6)',
+        }),
+        stroke: new Stroke({
+            color: '#fcba03',
+            width: 3,
+        }),
+    }),
+});
+
+const elevProfile = new Profile({
+    width: 650,
+});
+
+var ptHike, featureHike;
+hikeSource.once('change',function(e) {
+    if (hikeSource.getState() === 'ready') {
+        console.log('ready');
+        featureHike = hikeSource.getFeatures()[0];
+        elevProfile.setGeometry(featureHike);
+        var coord = featureHike.getGeometry().getCoordinates()
+        ptHike = new Feature(new Point(coord[0]));
+        console.log(coord[0]);
+        ptHike.setStyle(pointStyle);
+        hikeSource.addFeature(ptHike);
+    }
+});
+
+// Draw a point on the map when mouse fly over profile
+function drawPoint(e) {
+  if (!ptHike) return;
+
+  if (e.type=="over"){
+    // Show point at coord
+    ptHike.setGeometry(new Point(e.coord));
+    ptHike.setStyle(pointStyle);
+  } else {
+    // hide point
+    ptHike.setStyle([]);
+  }
+};
+// Show a popup on over
+elevProfile.on(["over","out"], function(e) {
+  if (e.type=="over") elevProfile.popup(e.coord[2]+" m");
+  drawPoint(e);
 });
 
 const sourceLocation = new VectorSource();
@@ -150,6 +220,19 @@ const lineStyle = new Style({
   }),
 });
 
+const pointStyle = new Style({
+      image: new Circle({
+        radius: 8,
+        fill: new Fill({
+            color: '#319FD3'
+        }),
+        stroke: new Stroke({
+          color: [255,0,0], 
+          width: 2
+        })
+      })
+    });
+
 const style = [lineStyle, labelStyle];
 
 function getContoursUrl(interval) {
@@ -186,6 +269,7 @@ const map = new Map({
     colormapLayer,
     hillshadeLayer,
     contoursLayer,
+    hikeLayer,
     debugLayer,
     //locationLayer,
   ],
@@ -248,6 +332,8 @@ var mousePositionControl = new MousePosition({
 });
 
 map.addControl(mousePositionControl);
+
+map.addControl(elevProfile);
 
 var container = document.getElementById('popup');
 var content = document.getElementById('popup-content');
@@ -385,6 +471,34 @@ var bm = new GeoBookmark({
     }
 });
 map.addControl(bm);
+
+var hello = new Button ({
+      html: '<i class="fa fa-map-o"></i>',
+      className: "terra3d-btn",
+      title: "3D",
+      handleClick: function() {
+        //info ("hello World!");
+        window.location.href = '/terra3d.html';
+      }
+    });
+    map.addControl(hello);
+
+// Show on map over
+  var hover = new Hover({ cursor: "pointer", hitTolerance:10 });
+  map.addInteraction(hover);
+  hover.on("hover", function(e) {
+    // Point on the line
+    var c = featureHike.getGeometry().getClosestPoint(e.coordinate)
+    drawPoint({ type: "over", coord: c });
+    // Show profile
+    var p = elevProfile.showAt(e.coordinate);
+    elevProfile.popup(p[2]+" m");
+  });
+  hover.on("leave", function(e) {
+    elevProfile.popup();
+    elevProfile.showAt();
+    drawPoint({});
+  });
 
 sync(map);
 

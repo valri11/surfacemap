@@ -6,6 +6,30 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
+        151.15591425157967,-33.68834372000069
+        ]
+      },
+      "properties": {
+        "name": "Sphinx Walk"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+        150.29059,-33.70371
+        ]
+      },
+      "properties": {
+        "name": "Six foot track"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
             150.3120553998699, -33.73196775624329
         ]
       },

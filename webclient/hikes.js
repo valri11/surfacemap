@@ -116,7 +116,7 @@ const sourceTerrain = new XYZ({
 
 
 const elevProfile = new Profile({
-    width: 650,
+    width: 410,
 });
 
 hikeSource.on('featuresloadend',function(e) {

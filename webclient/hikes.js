@@ -18,6 +18,7 @@ import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import {circular} from 'ol/geom/Polygon';
 import Control from 'ol/control/Control';
+import * as olExtent from 'ol/extent';
 import autoComplete from '@tarekraafat/autocomplete.js';
 
 import 'ol/ol.css';
@@ -29,51 +30,90 @@ import Button from 'ol-ext/control/Button';
 import Profile from 'ol-ext/control/Profile';
 import Hover from 'ol-ext/interaction/Hover';
 
-import * as places from './hikes_places.json';
-
 const placesList = document.getElementById('places-list');
 const placesListOverlay = document.getElementById('places-list-overlay');
 const title = document.getElementById('title');
 //const subtitle = document.getElementById('subtitle');
 
-var selectedPlaceName;
 var ptHike, featureHike;
 
 function loadPlace(feat) {
     console.log(JSON.stringify(feat))
 
-    const { name, data } = feat.properties;
-    const [longitude, latitude] = feat.geometry.coordinates;
-    const location = fromLonLat([longitude, latitude]);
+    const props = feat.getProperties()
+    //const { name, data } = feat.properties;
+    const name = props['name'];
+    const ee = feat.getGeometry().getExtent();
+    const location = olExtent.getCenter(ee);
+    //const [longitude, latitude] = feat.geometry.coordinates;
+    //const location = fromLonLat([longitude, latitude]);
 
     // load data
     hikeSource.clear();
-    hikeSource.setUrl(data);
+    const url = `${env.hikesnearme.baseUrl}/hikes/${feat.getId()}`;
+    hikeSource.setUrl(url);
+    //hikeSource.setUrl(data);
     hikeSource.refresh();
 
     view.setCenter(location);
     placesListOverlay.classList.add( 'hidden' );
 
     title.innerHTML = name;
-    selectedPlaceName = name;
 }
 
 title.addEventListener( 'click', () => {
     placesListOverlay.classList.remove( 'hidden' );
 } );
 
+var hikesInfoSource = new VectorSource({
+    url: `${env.hikesnearme.baseUrl}/hikes/info`,
+    format: new GeoJSON(),
+});
+
+hikesInfoSource.on('featuresloadend',function(e) {
+    console.log('hikes info loaded');
+
+    var fc = hikesInfoSource.getFeatures();
+    fc.sort((a, b) => {
+        const pa = new Date(a.getProperties()['event_ts']);
+        const pb = new Date(b.getProperties()['event_ts']);
+
+        const ta = a.getProperties()['event_type'];
+        const tb = b.getProperties()['event_type'];
+        if (ta === tb) {
+            return pb - pa;
+        }
+        return ta > tb ? 1 : -1;
+    });
+
+    fc.forEach(function (f) {
+        const li = document.createElement( 'li' );
+        let p = document.createElement( 'p' );
+        const props = f.getProperties();
+        const date = new Date(props['event_ts']).toISOString().substring(0,10);
+        const caption = props['name'] + ' ' + date;
+        console.log(caption);
+        p.innerHTML = caption;
+        li.appendChild( p );
+        p = document.createElement( 'p' );
+        li.appendChild( p );
+        placesList.appendChild( li );
+        li.addEventListener( 'click', () => loadPlace(f));
+    });
+
+    if (fc.length > 0) {
+        loadPlace(fc[0]);
+    }
+});
+
+var hikesInfoLayer = new VectorLayer({
+    title: 'hikes-info',
+    source: hikesInfoSource,
+});
+
 var hikeSource = new VectorSource({
     url: './six_foot_track.json',
     format: new GeoJSON(),
-
-    //url: './mount-colah-to-bobbin-head-loop-via-the-sphinx.gpx',
-    //url: './avoca-to-putty-beach.gpx',
-    //url: './Wondabyne_27May2023.gpx',
-    //url: './CavesBeach_05Aug2023.gpx',
-    //url: './bungonia_hike.gpx',
-    //url: './Six foot track.gpx',
-    //url: './six-foot-track-dec23.gpx',
-    //format: new GPX(),
 });
 
 var hikeLayer = new VectorLayer({
@@ -88,20 +128,6 @@ var hikeLayer = new VectorLayer({
             width: 3,
         }),
     }),
-});
-
-places.features.map((feat, i) => {
-    console.log(JSON.stringify(feat))
-    const li = document.createElement( 'li' );
-    let p = document.createElement( 'p' );
-    p.innerHTML = feat.properties.name;
-    li.appendChild( p );
-    p = document.createElement( 'p' );
-    //p.innerHTML = i + 1;
-    li.appendChild( p );
-    placesList.appendChild( li );
-    li.addEventListener( 'click', () => loadPlace(feat));
-
 });
 
 // hillshade images
@@ -196,7 +222,7 @@ var ctrInterval = 100;
 
 const view = new View({
   //center: katoomba,
-  zoom: 14
+  zoom: 15
 });
 
 const labelStyle = new Style({
@@ -273,16 +299,13 @@ const map = new Map({
     hillshadeLayer,
     contoursLayer,
     hikeLayer,
+    hikesInfoLayer,
     debugLayer,
     //locationLayer,
   ],
   controls: defaultControls({attribution: false}).extend([attribution]),
   view: view
 });
-
-if (places.features.length > 0) {
-    loadPlace(places.features[0]);
-}
 
 function onClick(id, callback) {
   document.getElementById(id).addEventListener('click', callback);
@@ -466,7 +489,7 @@ var btnTerra3d = new Button ({
   title: "3D",
   handleClick: function() {
     //info ("hello World!");
-    window.location.href = '/terra3d.html';
+    window.location.href = '/hikes3d.html';
   }
 });
 map.addControl(btnTerra3d);

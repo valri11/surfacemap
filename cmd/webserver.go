@@ -262,8 +262,8 @@ func mainCmd(cmd *cobra.Command, args []string) {
 	}
 
 	logger := otelzap.New(loggerZap,
-		otelzap.WithMinLevel(zap.DebugLevel),
-		otelzap.WithTraceIDField(true))
+		otelzap.WithMinLevel(zap.DebugLevel))
+	//otelzap.WithTraceIDField(true))
 	defer logger.Sync()
 
 	undo := otelzap.ReplaceGlobals(logger)

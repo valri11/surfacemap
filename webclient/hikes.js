@@ -56,6 +56,7 @@ function loadPlace(feat) {
     hikeSource.refresh();
 
     view.setCenter(location);
+    view.setZoom(15);
     placesListOverlay.classList.add( 'hidden' );
 
     title.innerHTML = name;
